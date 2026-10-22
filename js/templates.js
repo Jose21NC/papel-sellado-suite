@@ -64,6 +64,8 @@
 
   if (typeof module !== 'undefined' && module.exports) { module.exports = { build, fieldKind, fieldText }; return; }
 
+  root.PS_TEMPLATES = { build };
+
   // ---------- diálogo ----------
   const $ = (s) => document.querySelector(s);
   const d = $('#dlg-templates');

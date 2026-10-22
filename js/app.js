@@ -249,11 +249,11 @@
         const assigned = w.paperIds.filter(Boolean).length;
         const last = w.printLog[w.printLog.length - 1];
         return `<tr data-id="${esc(w.id)}">
-          <td><a href="#trabajo/${esc(w.id)}">${LABELS.includes(w.label) ? `<span class="tag ${w.label}" title="Etiqueta ${w.label}"></span>` : ''}<strong>${esc(w.title)}</strong></a></td>
+          <td><a href="#trabajo/${esc(w.id)}">${LABELS.includes(w.label) ? `<span class="tag ${w.label}" title="Etiqueta ${w.label}"></span>` : ''}<strong>${esc(w.title)}</strong></a>${w.protocolo ? `<div class="muted">${escrituras(w)} escritura${escrituras(w) === 1 ? '' : 's'}</div>` : ''}</td>
           <td>${esc(w.client || '—')}</td>
           <td><span class="pill ${esc(w.kind)}">${esc(cap(w.kind))}${w.paperValue ? ' C$' + esc(w.paperValue) : ''}</span></td>
           <td>${sheets} <span class="muted">(${assigned} con papel)</span></td>
-          <td><span class="pill ${esc(w.status)}">${esc(cap(w.status))}</span></td>
+          <td>${w.protocolo ? (w.protocolo >= thisYear() ? '<span class="pill impreso" title="Se cierra el 31 de diciembre">Activo</span>' : '<span class="pill">Cerrado</span>') : `<span class="pill ${esc(w.status)}">${esc(cap(w.status))}</span>`}</td>
           <td class="muted">${w.printLog.length ? `${w.printLog.length} · ${esc(fmtDate(last.at))}` : '—'}</td>
           <td class="muted">${esc(fmtDate(w.updatedAt))}</td>
           <td class="actions">
@@ -297,6 +297,7 @@
   menu.addEventListener('beforetoggle', (e) => {
     if (e.newState !== 'open') return;
     for (const b of menu.querySelectorAll('[data-label]')) b.setAttribute('aria-pressed', b.dataset.label === (menuWork.label || ''));
+    menu.querySelector('[data-act=protocol]').hidden = !!menuWork.protocolo;
     // Alineado a la derecha del botón; hacia arriba si no cabe debajo.
     const r = menu.anchorButton.getBoundingClientRect();
     const up = r.bottom > innerHeight - 260;
@@ -311,6 +312,8 @@
       w.label = btn.dataset.label || undefined;
       await DB.put('works', w);
       renderWorks();
+    } else if (btn.dataset.act === 'protocol') {
+      addToProtocol(w);
     } else if (btn.dataset.act === 'copy') {
       pendingCopy = w.id;
       go('trabajo/' + w.id);
@@ -474,7 +477,12 @@
   $('#ed-title').addEventListener('input', (e) => saveMeta((w) => { w.title = e.target.value.trim() || 'Sin título'; }));
   $('#ed-client').addEventListener('input', (e) => saveMeta((w) => { w.client = e.target.value.trim(); }));
   $('#ed-notes').addEventListener('input', (e) => saveMeta((w) => { w.notes = e.target.value; }));
-  $('#ed-state').addEventListener('change', (e) => saveMeta((w) => { w.status = e.target.value; }));
+  // Al terminar una escritura se ofrece agregarla al protocolo del año.
+  $('#ed-state').addEventListener('change', async (e) => {
+    const w = state.work;
+    await saveMeta(() => { w.status = e.target.value; });
+    if (w.status === 'finalizado' && !w.protocolo && !w.protocoloAt && protocolOf(thisYear())) addToProtocol(w);
+  });
   $('#ed-kind').addEventListener('change', (e) => saveMeta((w) => { w.kind = e.target.value; w.paperValue = null; }).then(fillValues));
   $('#ed-value').addEventListener('change', (e) => saveMeta((w) => { w.paperValue = e.target.value === '' ? null : Number(e.target.value); }));
 
@@ -526,6 +534,80 @@
   }
   $('#bg-mode').addEventListener('click', (e) => { const b = e.target.closest('[data-bg]'); if (b) setBg(b.dataset.bg); });
   try { setBg(localStorage.getItem('pss-bg') || ''); } catch { setBg(''); }
+
+  // ---------- protocolo ----------
+  // El protocolo del año es un trabajo más (w.protocolo = año): un solo documento que crece con cada escritura y
+  // queda activo hasta el 31 de diciembre. Se empieza con el acta de apertura o subiendo el que se lleva en Word.
+  const thisYear = () => new Date().getFullYear();
+  const protocolOf = (year) => state.works.find((w) => w.protocolo === year) || null;
+  const escrituras = (w) => (plain(w).match(/escritura\s+p[úu]blica\s+n[úu]mero/g) || []).length;
+
+  $('#btn-protocolo').addEventListener('click', async () => {
+    const open = protocolOf(thisYear());
+    if (open) { go('trabajo/' + open.id); return; }
+    const d = $('#dlg-protocolo');
+    $('#protocolo-anio').value = thisYear();
+    d.returnValue = '';
+    d.showModal();
+    const how = await new Promise((r) => d.addEventListener('close', () => r(d.returnValue), { once: true }));
+    const year = Math.round(Number($('#protocolo-anio').value)) || thisYear();
+    if (how === 'docx') { $('#file-docx').dataset.year = year; $('#file-docx').click(); }
+    else if (how === 'nuevo') {
+      const apertura = PLANTILLAS.find((t) => t.id === 'apertura-protocolo');
+      await createProtocol(year, PS_TEMPLATES.build(apertura, { ...Profile.get(), protocoloAnio: String(year) }, new Date(), ''));
+    }
+  });
+
+  $('#file-docx').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    let doc;
+    try { doc = await PS_DOCX.read(await file.arrayBuffer()); } catch (err) {
+      console.error(err);
+      toast('No se pudo leer el archivo: debe ser un documento de Word (.docx).');
+      return;
+    }
+    const font = FONTS.find(([, label]) => label.toLowerCase() === (doc.font || '').toLowerCase());
+    await createProtocol(Number(e.target.dataset.year), cleanStored(doc.html), { ...(font && { font: font[0] }), ...(doc.size && { size: doc.size }) });
+  });
+
+  async function createProtocol(year, html, settings) {
+    if (protocolOf(year)) { toast(`Ya existe el protocolo ${year}.`); return; }
+    const w = newWork({ title: `Protocolo ${year}`, kind: 'protocolo' });
+    Object.assign(w, { protocolo: year, pages: [html || '<p><br></p>'] });
+    Object.assign(w.settings, settings);
+    await DB.put('works', w);
+    state.works.push(w);
+    go('trabajo/' + w.id);
+    toast(`Protocolo ${year}: ${escrituras(w)} escritura${escrituras(w) === 1 ? '' : 's'}. Agregue cada escritura terminada desde su menú «⋯» o al marcarla «Finalizado».`);
+  }
+
+  // Agrega el texto de un trabajo al final del protocolo del año (los párrafos partidos entre páginas se juntan).
+  async function addToProtocol(w) {
+    const p = protocolOf(thisYear());
+    if (!p) { toast(`Primero cree o suba su protocolo ${thisYear()} con el botón «Protocolo» de Mis trabajos.`); return; }
+    if (state.work === w) await saveWork();
+    const n = escrituras(p), pending = w.pages.join('').split('class="campo"').length - 1;
+    const text = [`«${w.title}» se agregará al final del protocolo ${p.protocolo}, que tiene ${n} escritura${n === 1 ? '' : 's'}.`,
+      pending && `Tiene ${pending} campo${pending === 1 ? '' : 's'} sin completar.`, w.protocoloAt && `Ya se agregó el ${fmtDate(w.protocoloAt)}.`].filter(Boolean).join(' ');
+    if (!(await confirmDialog('Agregar al protocolo', text, 'Agregar'))) return;
+    const html = Editor.joinPages(w.pages);
+    p.pages = plain(p).trim() ? [...p.pages.slice(0, -1), p.pages[p.pages.length - 1] + html] : [html];
+    p.updatedAt = w.protocoloAt = now();
+    delete p._plain;
+    await DB.putMany('works', [p, w]);
+    toast(`Agregado al protocolo ${p.protocolo}: ahora tiene ${escrituras(p)} escritura${escrituras(p) === 1 ? '' : 's'}.`);
+    if (!$('#view-works').hidden) renderWorks();
+  }
+
+  // En Plantillas, el Nº de escritura sigue al protocolo del año.
+  $('#btn-templates').addEventListener('click', () => {
+    const p = protocolOf(thisYear());
+    if (!p || p === state.work && unsaved()) return;
+    $('#tpl-num').value = escrituras(p) + 1;
+    $('#tpl-num').dispatchEvent(new Event('input'));
+  });
 
   // ---------- asignación de papel ----------
   const matches = (w, p) => p.type === w.kind && (w.paperValue == null || p.value === w.paperValue);
@@ -785,6 +867,7 @@
         paperIds: (Array.isArray(w.paperIds) ? w.paperIds : []).map((id) => str(id) || null),
         printLog: (Array.isArray(w.printLog) ? w.printLog : []).map((l) => ({ at: str(l.at), mode: l.mode === 'fondo' ? 'fondo' : 'texto', pages: num(l.pages) ?? 0 })),
         printedChars: Math.max(0, num(w.printedChars) ?? 0), label: LABELS.includes(w.label) ? w.label : undefined,
+        protocolo: Number.isInteger(num(w.protocolo)) ? num(w.protocolo) : undefined, protocoloAt: str(w.protocoloAt) || undefined,
       }));
       for (const w of works) w.settings.font = FONTS.some(([v]) => v === w.settings.font) ? w.settings.font : DEFAULT_SETTINGS.font;
       // Lo local manda: una hoja que ya existe conserva su estado y trabajo actuales; no se duplica una serie-número.

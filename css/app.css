@@ -109,6 +109,7 @@ td.actions .btn { padding: 0 8px; }
 td.muted { min-width: 140px; font-size: 13px; text-wrap: balance; }
 #works-table td:nth-child(4) { white-space: nowrap; }
 #works-table td:first-child a { color: var(--ink); }
+#works-table td:first-child .muted { font-size: 12px; }
 #works-table td:first-child .tag { margin-right: 8px; vertical-align: 1px; }
 .btn.more { width: 30px; padding: 0 !important; }
 .btn.more .ico { fill: currentColor; stroke: none; }

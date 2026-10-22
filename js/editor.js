@@ -749,6 +749,20 @@ const Editor = (() => {
     if (!spansPages()) insertClean(e.clipboardData);
   }
 
+  // Vuelve a juntar en `box` los párrafos partidos entre páginas.
+  function joinAll(box) {
+    for (const p of [...box.children]) if (p.parentNode === box) while (joinSplit(p, p.nextElementSibling));
+    for (const p of box.children) { p.removeAttribute('data-split'); p.removeAttribute('data-cont'); }
+  }
+
+  // Las caras de un trabajo guardado en un solo HTML (p. ej. para agregarlo al protocolo).
+  function joinPages(pages) {
+    const box = document.createElement('div');
+    box.innerHTML = pages.join('');
+    joinAll(box);
+    return box.innerHTML;
+  }
+
   // Copiar una selección de varias páginas: solo el texto (sin barras ni números de renglón) y con los
   // párrafos partidos entre páginas vueltos a unir.
   function onCopy(e) {
@@ -764,8 +778,7 @@ const Editor = (() => {
       if (ed.contains(r.endContainer)) sub.setEnd(r.endContainer, r.endOffset);
       box.append(sub.cloneContents());
     }
-    for (const p of [...box.children]) if (p.parentNode === box) while (joinSplit(p, p.nextElementSibling));
-    for (const p of box.children) { p.removeAttribute('data-split'); p.removeAttribute('data-cont'); }
+    joinAll(box);
     e.clipboardData.setData('text/html', box.innerHTML);
     e.clipboardData.setData('text/plain', [...box.children].map((p) => p.textContent).join('\n'));
   }
@@ -1107,7 +1120,7 @@ const Editor = (() => {
   }
 
   return {
-    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml, edit, refreshPrinted, printedUpTo,
+    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml, edit, refreshPrinted, printedUpTo, joinPages,
     pagesHtml: () => eds.map((e) => e.innerHTML),
     pageCount: () => eds.length,
     paperForPage: paperFor,
