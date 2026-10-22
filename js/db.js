@@ -1,23 +1,25 @@
-// Almacenamiento local en IndexedDB: los documentos nunca salen del navegador.
+// Almacenamiento local en IndexedDB, una base por cuenta (la de antes de las cuentas no lleva sufijo).
 // files: PDF originales · papers: hojas de papel sellado · works: trabajos · settings: preferencias.
+// outbox: cambios por subir a la nube (js/cloud.js). Cada cambio que no sea `local` se avisa a onChange.
 const DB = (() => {
-  const STORES = ['files', 'papers', 'works', 'settings'];
-  let dbPromise;
+  const STORES = ['files', 'papers', 'works', 'settings', 'outbox'];
+  const BASE = 'papel-sellado-suite';
+  let name = BASE, dbPromise;
 
-  function open() {
-    dbPromise = dbPromise || new Promise((resolve, reject) => {
-      const req = indexedDB.open('papel-sellado-suite', 1);
+  function openDb(dbName) {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName, 2);
       req.onupgradeneeded = () => {
-        for (const name of STORES) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name, { keyPath: 'id' });
+        for (const s of STORES) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s, { keyPath: 'id' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
-    return dbPromise;
   }
+  const open = () => (dbPromise = dbPromise || openDb(name));
 
-  async function tx(store, mode, fn) {
-    const db = await open();
+  async function tx(store, mode, fn, db) {
+    db = db || await open();
     return new Promise((resolve, reject) => {
       const t = db.transaction(store, mode);
       const result = fn(t.objectStore(store));
@@ -27,14 +29,39 @@ const DB = (() => {
     });
   }
 
-  return {
+  const api = {
+    onChange: null,
+    // Pasa a la base de la cuenta `uid`.
+    use(uid) { name = uid ? `${BASE}-${uid}` : BASE; dbPromise = null; },
     all: (store) => tx(store, 'readonly', (s) => s.getAll()),
     get: (store, id) => tx(store, 'readonly', (s) => s.get(id)),
-    put: (store, value) => tx(store, 'readwrite', (s) => { s.put(value); }),
-    putMany: (store, values) => tx(store, 'readwrite', (s) => { values.forEach((v) => s.put(v)); }),
-    del: (store, id) => tx(store, 'readwrite', (s) => { s.delete(id); }),
+    put: (store, value, local) => api.putMany(store, [value], local),
+    async putMany(store, values, local) {
+      await tx(store, 'readwrite', (s) => { values.forEach((v) => s.put(v)); });
+      if (!local && values.length) api.onChange?.(store, values.map((v) => v.id), 'put');
+    },
+    async del(store, id, local) {
+      await tx(store, 'readwrite', (s) => { s.delete(id); });
+      if (!local) api.onChange?.(store, [id], 'del');
+    },
+    // Todo lo guardado en la base sin cuenta (para subirlo a la cuenta la primera vez).
+    async legacy() {
+      if (indexedDB.databases && !(await indexedDB.databases()).some((d) => d.name === BASE)) return null;
+      const db = await openDb(BASE);
+      const out = {};
+      for (const s of ['files', 'papers', 'works', 'settings']) out[s] = await tx(s, 'readonly', (st) => st.getAll(), db);
+      db.close();
+      return out;
+    },
+    // Borra la copia local de la cuenta (al cerrar sesión).
+    async drop() {
+      (await dbPromise)?.close();
+      dbPromise = null;
+      await new Promise((r) => { const q = indexedDB.deleteDatabase(name); q.onsuccess = q.onerror = q.onblocked = r; });
+    },
     STORES,
   };
+  return api;
 })();
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));

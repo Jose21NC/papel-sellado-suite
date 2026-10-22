@@ -8,7 +8,7 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 - El cambio más pequeño que resuelva todo. No agregar opciones ni código "para después".
 - **La geometría de impresión es sagrada.** Las páginas miden 612×1008 pt (legal) y el texto debe caer sobre los 30 renglones de la DGI. No tocar sin necesidad: `.page`, `.area`, `.seal`, `.ed` (y sus `p`), `.dash`, `.rule`, `p.firma`, `.f2`, `@page` ni el bloque `@media print` de `css/app.css`.
 - HTML de un trabajo: `p` (alineación, `firma`), `b`, `i`, `u`, `br`, `span.f2`, `span.campo`. Todo HTML que se guarde en un trabajo debe estar permitido en `normalize()` (editor), en `sanitize()` si debe sobrevivir al pegar, y en `cleanStored()` (importar respaldo, `js/app.js`).
-- Los datos viven solo en el navegador (IndexedDB). Nunca subir al repo PDFs ni protocolos .docx reales: traen datos personales (`*.pdf`, `*.docx` y `local/` están en `.gitignore`; las pruebas usan documentos sintéticos).
+- Los datos viven en IndexedDB (una base por cuenta) y, si `js/firebase-config.js` está lleno, también en Firebase (`js/cloud.js`, ver `FIREBASE.md`): todo cambio pasa por `DB.put/putMany/del`, que lo anota en la cola `outbox`; escrituras que vienen de la nube usan `local = true`. Sin configuración la suite funciona sin cuenta. Nunca subir al repo PDFs ni protocolos .docx reales: traen datos personales (`*.pdf`, `*.docx` y `local/` están en `.gitignore`; las pruebas usan documentos sintéticos).
 
 ## Mapa del código
 | Archivo | Qué hace |
@@ -16,10 +16,11 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 | `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-perfil` con Mis datos y respaldo, `#view-editor`), barra del editor y todos los `<dialog>` |
 | `css/app.css` | Estilos con variables en `:root` (claro/oscuro), estética minimalista tipo Apple; reglas de papel e impresión |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
-| `js/db.js` | IndexedDB: `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) |
+| `js/db.js` | IndexedDB por cuenta (`DB.use(uid)`): `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) y `outbox` (cambios por subir); `DB.onChange` avisa a la nube |
+| `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña), Firestore y Storage de Firebase por REST, sin SDK; cola de subida, `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
 | `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp); `write()` arma el PDF descargable (una imagen JPEG por página) |
 | `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF»; «Ocultar lo impreso» marca los primeros `work.printedChars` caracteres con `CSS.highlights` (`::highlight(impreso)`) y sus guiones con `.dash.impreso` |
-| `js/app.js` | Rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), protocolo del año (`w.protocolo = año`, `addToProtocol`, importar .docx), respaldo, bloqueo de una sola pestaña |
+| `js/app.js` | Pantalla de entrada (`login`, `openAccount`), rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), protocolo del año (`w.protocolo = año`, `addToProtocol`, importar .docx), respaldo, bloqueo de una sola pestaña |
 | `js/words.js` | Números, fechas y horas en letras (pruebas en `test/words.test.js`) |
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
 | `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md`. Un clic en un campo `[ASÍ]` abre `#dlg-campo`: `fieldKind`/`fieldText` (con pruebas) deciden cómo se escribe el dato |
@@ -41,5 +42,6 @@ No hay paso de compilación: publicar es `git push` a `main` (GitHub Pages tarda
 
 ## Estado y pendientes conocidos
 - Sin probar en Safari ni Firefox.
+- Firebase: probado contra un Firebase simulado, falta probarlo con un proyecto real. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
 - En el celular la barra del editor se desplaza de lado (a propósito: no cabe en una fila).
 - Plantillas: son modelos; la base legal de la frase del quinquenio y los requisitos actuales de Migración para menores no se verificaron.

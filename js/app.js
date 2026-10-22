@@ -64,8 +64,18 @@
     state.app = (await DB.get('settings', 'app')) || state.app;
   }
 
+  // Con cuenta, un PDF que aún no está en este navegador se baja de la nube la primera vez que se usa.
   async function fileBlob(fileId) {
-    if (!state.files.has(fileId)) state.files.set(fileId, DB.get('files', fileId).then((f) => f?.blob));
+    if (!state.files.has(fileId)) {
+      const p = DB.get('files', fileId).then(async (f) => {
+        if (!f || f.blob || !Cloud.user()) return f?.blob;
+        const blob = await Cloud.fileBlob(fileId);
+        await DB.put('files', { ...f, blob }, true);
+        return blob;
+      });
+      p.catch(() => state.files.delete(fileId));
+      state.files.set(fileId, p);
+    }
     return state.files.get(fileId);
   }
 
@@ -95,10 +105,86 @@
   const go = (r) => { location.hash = r; };
 
   function renderPerfil() {
+    const u = Cloud.user(), st = Cloud.status;
+    $('#cuenta-info').textContent = u ? u.email : 'Esta copia de la suite no tiene Firebase configurado: todo se guarda solo en este navegador.';
+    $('#cuenta-sync').textContent = !u ? '' : st.pending ? `${st.pending} cambio${st.pending === 1 ? '' : 's'} por subir a su cuenta.${st.error ? ' ' + st.error : ''}` : 'Todo está guardado en su cuenta.';
+    $('#btn-logout').hidden = !u;
     const p = Profile.get();
     $('#perfil-resumen').textContent = p.nombre ? `${p.nombre}${p.titulo ? ' · ' + p.titulo : ''}` : 'Todavía no ha guardado sus datos.';
   }
   $('#dlg-profile').addEventListener('close', () => setTimeout(renderPerfil)); // Profile ya guardó lo nuevo
+  addEventListener('cloud-status', () => { if (!$('#view-perfil').hidden) renderPerfil(); });
+
+  // ---------- cuenta ----------
+  // Pantalla de entrada: se resuelve cuando hay sesión.
+  function login() {
+    document.body.classList.add('auth-view');
+    $('#auth').hidden = false;
+    const f = $('#auth-form'), err = $('#auth-error');
+    let create = false;
+    const mode = () => {
+      $('#auth-title').textContent = $('#auth-submit').textContent = create ? 'Crear cuenta' : 'Entrar';
+      $('#auth-switch').textContent = create ? '¿Ya tiene cuenta? Entrar' : '¿No tiene cuenta? Crear una';
+      $('#auth-confirm').hidden = !create;
+      $('#auth-reset').hidden = create;
+      f.password.autocomplete = create ? 'new-password' : 'current-password';
+      err.textContent = '';
+    };
+    mode();
+    $('#auth-switch').onclick = () => { create = !create; mode(); };
+    $('#auth-reset').onclick = async () => {
+      if (!f.email.value.trim()) { err.textContent = 'Escriba su correo y vuelva a pulsar «¿Olvidó su contraseña?».'; return; }
+      try { await Cloud.resetPassword(f.email.value.trim()); err.textContent = ''; toast('Le enviamos un correo para cambiar la contraseña.'); } catch (e) { err.textContent = e.message; }
+    };
+    return new Promise((resolve) => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = f.email.value.trim(), password = f.password.value;
+        if (!email || !password) { err.textContent = 'Escriba su correo y su contraseña.'; return; }
+        if (create && password !== f.confirm.value) { err.textContent = 'Las contraseñas no coinciden.'; return; }
+        $('#auth-submit').disabled = true;
+        try {
+          await Cloud.signIn(email, password, create);
+          f.reset();
+          $('#auth').hidden = true;
+          document.body.classList.remove('auth-view');
+          resolve();
+        } catch (e2) { err.textContent = e2.message; } finally { $('#auth-submit').disabled = false; }
+      };
+    });
+  }
+
+  // Abre la copia local de la cuenta, sube lo pendiente y trae lo de la nube. Sin conexión sigue con lo local.
+  async function openAccount() {
+    DB.use(Cloud.user().uid);
+    await Cloud.start();
+    try {
+      await Cloud.flush();
+      await Cloud.pull();
+    } catch (err) {
+      if (err.code) { Cloud.signOut(); await login(); return openAccount(); } // la sesión ya no vale
+      toast('Sin conexión con su cuenta: se muestra lo guardado en este navegador.');
+      return;
+    }
+    // La primera vez, lo que ya había en este navegador (sin cuenta) se puede pasar a la cuenta.
+    if ((await DB.all('works')).length || (await DB.all('papers')).length) return;
+    const old = await DB.legacy();
+    if (!old || !(old.works.length || old.papers.length)) return;
+    if (!(await confirmDialog('Datos en este navegador', `Este navegador tiene ${old.works.length} trabajos y ${old.papers.length} hojas de papel sellado guardados sin cuenta. ¿Pasarlos a su cuenta?`, 'Pasarlos a mi cuenta'))) return;
+    for (const s of ['files', 'papers', 'works', 'settings']) await DB.putMany(s, old[s]);
+    toast('Subiendo sus datos a su cuenta…');
+  }
+
+  $('#btn-logout').addEventListener('click', async () => {
+    await Cloud.flush();
+    const n = Cloud.status.pending;
+    const text = n ? `Hay ${n} cambio${n === 1 ? '' : 's'} sin subir a su cuenta que se perderán. Revise su conexión antes de salir.`
+      : 'Se borra la copia de sus datos en este navegador; siguen guardados en su cuenta.';
+    if (!(await confirmDialog('Cerrar sesión', text, 'Cerrar sesión', !!n))) return;
+    Cloud.signOut();
+    await DB.drop();
+    location.reload();
+  });
   document.addEventListener('click', (e) => {
     const r = e.target.closest('[data-route]');
     if (r) go(r.dataset.route);
@@ -812,7 +898,7 @@
     const files = await DB.all('files');
     const out = {
       app: 'papel-sellado-suite', version: 1, exportedAt: now(),
-      files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(f.blob) }))),
+      files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(await fileBlob(f.id)) }))),
       papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app, profile: Profile.filled() ? Profile.get() : undefined,
     };
     const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
@@ -926,6 +1012,11 @@
     if (!alone) {
       document.querySelector('main').innerHTML = '<div class="empty">La suite ya está abierta en otra pestaña o ventana. Use esa, o ciérrela y recargue esta página, para no sobrescribir sus trabajos.</div>';
       return;
+    }
+    // Con Firebase configurado, la suite pide cuenta; sin configurar, todo queda en este navegador como antes.
+    if (Cloud.enabled) {
+      if (!Cloud.resume()) await login();
+      await openAccount();
     }
     try {
       navigator.storage?.persist?.(); // pide al navegador no borrar los datos por falta de espacio

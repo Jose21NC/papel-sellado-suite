@@ -82,7 +82,7 @@ dialog .btn.danger:hover { background: #b80012; }
 td.actions .btn:not(.danger), .sheet-bar .btn, .btn.back { color: var(--accent-text); }
 .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); }
 .btn:disabled { opacity: .4; cursor: default; transform: none; }
-input[type=text], input[type=search], input[type=number], input[type=tel], input[type=email], input[type=date], input[type=time], select, textarea {
+input[type=text], input[type=search], input[type=number], input[type=tel], input[type=email], input[type=password], input[type=date], input[type=time], select, textarea {
   height: 34px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--field); transition: border-color .15s, box-shadow .15s; }
 textarea { height: auto; padding: 8px 10px; }
 input[type=search] { padding-left: 30px; background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='m10.5 10.5 3 3'/%3E%3C/svg%3E") no-repeat 10px center / 14px; }
@@ -90,6 +90,18 @@ input:not([type=checkbox]):not([type=radio]):focus-visible, select:focus-visible
 input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 
 /* ---------- tarjetas y tablas ---------- */
+/* Entrar o crear cuenta: ocupa toda la página hasta que haya sesión. */
+body.auth-view > :not(#auth):not(.toast) { display: none !important; }
+.auth { display: grid; place-items: center; min-height: 100vh; padding: 24px 16px; }
+.auth-card { display: grid; gap: 14px; width: min(380px, 100%); padding: 32px 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-dialog); }
+.auth-card .brand-mark svg { width: 40px; height: 40px; }
+.auth-card h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+.auth-card p { margin: 0; }
+.auth-card label { display: grid; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.auth-card .btn.primary { width: 100%; }
+.auth-card .linklike { justify-self: center; }
+.auth-error { min-height: 1.2em; color: var(--red); font-size: 13px; }
+.auth-error:empty { display: none; }
 .panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 .panel { display: grid; gap: 10px; justify-items: start; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
 .panel h2 { margin: 0; font-size: 17px; font-weight: 600; }
