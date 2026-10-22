@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Papel Sellado Suite</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span> Papel Sellado Suite</div>
+    <nav class="tabs" aria-label="Secciones">
+      <button class="tab" data-route="trabajos">Mis trabajos</button>
+      <button class="tab" data-route="papel">Papel sellado</button>
+    </nav>
+    <div class="spacer"></div>
+    <button class="btn small" id="btn-export" title="Descarga un archivo con todos sus trabajos y papeles">Exportar respaldo</button>
+    <button class="btn small" id="btn-import" title="Restaura un respaldo exportado antes">Importar respaldo</button>
+  </header>
+
+  <main>
+    <!-- Trabajos -->
+    <section id="view-works" hidden>
+      <div class="view-head">
+        <h1>Mis trabajos</h1>
+        <button class="btn primary" id="btn-new-work">+ Nuevo trabajo</button>
+        <div class="spacer"></div>
+        <div class="filters">
+          <input type="search" id="works-search" placeholder="Buscar por título, cliente o texto" aria-label="Buscar trabajos">
+          <select id="works-status" aria-label="Filtrar por estado">
+            <option value="">Todos los estados</option>
+            <option value="borrador">Borrador</option>
+            <option value="impreso">Impreso</option>
+            <option value="finalizado">Finalizado</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" id="works-table"></div>
+    </section>
+
+    <!-- Papel sellado -->
+    <section id="view-papers" hidden>
+      <div class="view-head">
+        <h1>Papel sellado</h1>
+        <button class="btn primary" id="btn-upload">+ Subir PDF</button>
+        <div class="spacer"></div>
+        <div class="filters">
+          <input type="search" id="papers-search" placeholder="Serie, número o valor (C$21)" aria-label="Buscar papel">
+          <select id="papers-type" aria-label="Filtrar por tipo">
+            <option value="">Todos los tipos</option>
+            <option value="testimonio">Testimonio</option>
+            <option value="protocolo">Protocolo</option>
+            <option value="otro">Otro</option>
+          </select>
+          <select id="papers-status" aria-label="Filtrar por estado">
+            <option value="">Todos los estados</option>
+            <option value="disponible">Disponible</option>
+            <option value="asignado">Asignado</option>
+            <option value="anulado">Anulado</option>
+          </select>
+        </div>
+      </div>
+      <div class="drop" id="drop" tabindex="0" role="button">
+        <strong>Arrastre aquí los PDF de papel sellado</strong> o haga clic para elegirlos.<br>
+        <span class="muted">Puede subir varios a la vez. Se leen el tipo, el valor, la serie y el número de cada hoja.</span>
+      </div>
+      <div class="cards" id="papers-cards"></div>
+      <div class="table-wrap" id="papers-table"></div>
+    </section>
+
+    <!-- Editor -->
+    <section id="view-editor" hidden>
+      <div class="toolbar">
+        <div class="group">
+          <button class="btn small" data-route="trabajos" title="Volver a mis trabajos">← Trabajos</button>
+          <input type="text" id="ed-title" aria-label="Título del trabajo" placeholder="Título del trabajo">
+          <span class="status" id="ed-status" role="status"></span>
+        </div>
+        <div class="group" aria-label="Formato">
+          <button class="btn small" data-cmd="bold" title="Negrita (Ctrl+B)"><b>N</b></button>
+          <button class="btn small" data-cmd="italic" title="Cursiva (Ctrl+I)"><i>K</i></button>
+          <button class="btn small" data-cmd="underline" title="Subrayado (Ctrl+U)"><u>S</u></button>
+          <button class="btn small" data-cmd="upper" title="Convertir a MAYÚSCULAS">AA</button>
+          <button class="btn small" data-cmd="lower" title="Convertir a minúsculas">aa</button>
+        </div>
+        <div class="group" aria-label="Alineación">
+          <button class="btn small" data-cmd="justifyLeft" title="Alinear a la izquierda">Izq</button>
+          <button class="btn small" data-cmd="justifyCenter" title="Centrar">Centro</button>
+          <button class="btn small" data-cmd="justifyRight" title="Alinear a la derecha">Der</button>
+          <button class="btn small" data-cmd="justifyFull" title="Justificar">Just</button>
+        </div>
+        <div class="group">
+          <select id="ed-font" aria-label="Tipo de letra"></select>
+          <label>Tamaño <input type="number" id="ed-size" min="8" max="16" step="0.5" aria-label="Tamaño de letra (pt)"></label>
+        </div>
+        <div class="group">
+          <button class="btn small" data-cmd="undo" title="Deshacer (Ctrl+Z)">↶</button>
+          <button class="btn small" data-cmd="redo" title="Rehacer (Ctrl+Shift+Z)">↷</button>
+          <button class="btn small" id="btn-bg" aria-pressed="true" title="Mostrar u ocultar el papel sellado en pantalla">Ver papel</button>
+        </div>
+        <div class="group">
+          <button class="btn small primary" id="btn-print-fondo" title="Imprime el papel sellado completo con el texto encima">Imprimir con papel</button>
+          <button class="btn small" id="btn-print-texto" title="Imprime solo el texto, para papel sellado ya impreso">Imprimir solo texto</button>
+        </div>
+      </div>
+      <div class="editor-wrap">
+        <aside class="side">
+          <h3>Datos del trabajo</h3>
+          <div class="row"><span>Cliente / partes</span></div>
+          <input type="text" id="ed-client" style="width:100%" aria-label="Cliente o partes">
+          <div class="row" style="margin-top:8px"><span>Tipo de papel</span>
+            <select id="ed-kind"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select></div>
+          <div class="row"><span>Valor</span><select id="ed-value"></select></div>
+          <div class="row"><span>Estado</span>
+            <select id="ed-state"><option value="borrador">Borrador</option><option value="impreso">Impreso</option><option value="finalizado">Finalizado</option></select></div>
+          <textarea id="ed-notes" placeholder="Notas (número de escritura, fecha, observaciones…)" aria-label="Notas"></textarea>
+
+          <h3>Papel</h3>
+          <p id="ed-count" class="muted" style="margin:0 0 8px"></p>
+          <button class="btn small" id="btn-autoassign" style="width:100%">Asignar papel disponible</button>
+
+          <h3>Texto</h3>
+          <div class="row"><label for="ed-indent">Sangría 1ª línea (pt)</label><input type="number" id="ed-indent" step="1" min="0" max="200"></div>
+          <div class="row"><label for="ed-ls">Espacio entre letras (pt)</label><input type="number" id="ed-ls" step="0.1" min="-1" max="3"></div>
+          <div class="row"><label for="ed-ml">Margen izquierdo (pt)</label><input type="number" id="ed-ml" step="1" min="-20" max="150"></div>
+          <div class="row"><label for="ed-mr">Margen derecho (pt)</label><input type="number" id="ed-mr" step="1" min="-20" max="150"></div>
+          <div class="row"><label for="ed-gap">Altura sobre el renglón (pt)</label><input type="number" id="ed-gap" step="0.5" min="-10" max="15"></div>
+          <div class="row"><label for="ed-dashes">Cerrar renglones con guiones</label><input type="checkbox" id="ed-dashes"></div>
+
+          <h3>Impresora (solo texto)</h3>
+          <p class="muted" style="margin:0 0 8px;font-size:12px">Si el texto sale corrido sobre el papel ya impreso, ajuste aquí. Se guarda para todos los trabajos.</p>
+          <div class="row"><label for="pr-x">Mover → (mm)</label><input type="number" id="pr-x" step="0.5"></div>
+          <div class="row"><label for="pr-y">Mover ↓ (mm)</label><input type="number" id="pr-y" step="0.5"></div>
+
+          <h3>Historial</h3>
+          <ul class="log" id="ed-log"></ul>
+        </aside>
+        <div class="pages" id="pages"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="dlg-work">
+    <form method="dialog">
+      <h2>Nuevo trabajo</h2>
+      <label>Título <input type="text" name="title" required placeholder="Ej.: Testimonio escritura Nº 45 — Compraventa"></label>
+      <label>Cliente / partes <input type="text" name="client"></label>
+      <label>Tipo de papel
+        <select name="kind"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select>
+      </label>
+      <div class="buttons"><button class="btn primary" value="ok">Crear</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-pick">
+    <form method="dialog">
+      <h2 id="pick-title">Elegir papel sellado</h2>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="pick-all"> Mostrar todos los tipos y valores</label>
+      <div class="paper-list" id="pick-list"></div>
+      <div class="buttons"><button class="btn primary" value="ok">Asignar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-paper">
+    <form method="dialog">
+      <h2>Editar papel</h2>
+      <label>Tipo <select name="type"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select></label>
+      <label>Valor (C$) <input type="number" name="value" min="0" step="1"></label>
+      <label>Serie <input type="text" name="serie"></label>
+      <label>Número <input type="text" name="numero"></label>
+      <div class="buttons"><button class="btn primary" value="ok">Guardar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-confirm">
+    <form method="dialog">
+      <h2 id="confirm-title">¿Confirmar?</h2>
+      <p id="confirm-text" style="margin:0"></p>
+      <div class="buttons"><button class="btn primary" id="confirm-ok" value="ok">Aceptar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <input type="file" id="file-pdf" accept="application/pdf,.pdf" multiple hidden>
+  <input type="file" id="file-backup" accept="application/json,.json" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="vendor/pdfjs/pdf.min.js"></script>
+  <!-- Cargar el worker como script hace que pdf.js trabaje en el hilo principal: así funciona también abriendo el archivo sin servidor. -->
+  <script src="vendor/pdfjs/pdf.worker.min.js"></script>
+  <script src="js/parse.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/pdf.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

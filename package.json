@@ -1,0 +1,9 @@
+{
+  "name": "papel-sellado-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Suite para escribir e imprimir sobre papel sellado digital de la DGI de Nicaragua",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
