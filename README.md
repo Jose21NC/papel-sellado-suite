@@ -27,7 +27,9 @@ Todo se guarda **en su navegador** (IndexedDB). Los documentos no se envían a n
 3. En **Papel sellado**, suba sus PDF. En **Mis trabajos**, cree un trabajo y escriba o pegue el texto.
 4. Para imprimir: en el diálogo de impresión deje **Tamaño: Legal (8.5 × 14 pulg.)**, **Márgenes: Ninguno** y **Escala: 100 %**.
 
-> Use siempre el mismo navegador y la misma carpeta: los datos quedan guardados en ese navegador.
+> Use siempre el mismo navegador y la misma carpeta: los datos quedan guardados en ese navegador. Abra la suite en una sola pestaña a la vez.
+
+Después de imprimir, la suite pregunta si el documento salió bien y solo entonces lo anota en el historial. Las hojas de un trabajo ya impreso se consideran gastadas: si las quita del trabajo, quedan **anuladas** en el inventario.
 
 ### Atajos
 
@@ -35,6 +37,8 @@ Todo se guarda **en su navegador** (IndexedDB). Los documentos no se envían a n
 |---|---|
 | Negrita / Cursiva / Subrayado | Ctrl + B / I / U |
 | Deshacer / Rehacer | Ctrl + Z / Ctrl + Shift + Z |
+| Seleccionar todo el documento (para copiarlo a Word o a un correo) | Ctrl + A, luego Ctrl + C |
+| Imprimir (con papel si hay papel asignado; si no, solo texto) | Ctrl + P |
 | Acercar / alejar la vista | Ctrl + / Ctrl − (zoom del navegador) |
 
 ## Desarrollo

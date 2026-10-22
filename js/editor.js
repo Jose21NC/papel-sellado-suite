@@ -479,7 +479,12 @@ const Editor = (() => {
     const r = document.createRange();
     r.selectNodeContents(ed);
     r.collapse(where === 'start');
-    if (where === 'start' && ed.firstElementChild) { r.selectNodeContents(ed.firstElementChild); r.collapse(true); }
+    // Dentro del primer texto: un cursor en el borde de un elemento no tiene posición en pantalla.
+    if (where === 'start' && ed.firstElementChild) {
+      const t = document.createTreeWalker(ed.firstElementChild, NodeFilter.SHOW_TEXT).nextNode();
+      if (t) r.setStart(t, 0); else r.selectNodeContents(ed.firstElementChild);
+      r.collapse(true);
+    }
     if (where === 'end') {
       const last = ed.lastElementChild;
       if (last) { r.selectNodeContents(last); r.collapse(false); if (last.lastChild?.nodeName === 'BR') r.setStartBefore(last.lastChild); }
