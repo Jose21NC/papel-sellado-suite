@@ -14,7 +14,8 @@ Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de
 | Archivo | Qué hace |
 |---|---|
 | `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-perfil` con Mis datos y respaldo, `#view-editor`), barra del editor y todos los `<dialog>` |
-| `css/app.css` | Estilos con variables en `:root` (claro/oscuro), estética minimalista tipo Apple; reglas de papel e impresión |
+| `css/app.css` | Estilos con variables en `:root` (claro/oscuro; paleta de Lexia: `--navy` #1B365D y `--sky` #4BB3DB), estética minimalista; reglas de papel e impresión |
+| `img/logo.svg` | Logo (favicon); en la página va como `<symbol id="logo">` dentro de `index.html`, con los colores de la paleta |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB por cuenta (`DB.use(uid)`): `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) y `outbox` (cambios por subir); `DB.onChange` avisa a la nube |
 | `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña) y Firestore de Firebase por REST, sin SDK ni Storage: los PDF van en trozos (`chunks`) de 750 KB; cola de subida (cada 20 s como máximo, por la cuota gratuita), `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
