@@ -4,6 +4,7 @@
   "private": true,
   "description": "Suite para escribir e imprimir sobre papel sellado digital de la DGI de Nicaragua",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "serve": "python3 -m http.server 8000"
   }
 }
