@@ -22,7 +22,7 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 | `js/app.js` | Rutas por hash, inventario, trabajos, autoguardado, asignación de papel, impresión, respaldo, bloqueo de una sola pestaña |
 | `js/words.js` | Números, fechas y horas en letras (pruebas en `test/words.test.js`) |
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
-| `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales (revisadas con el Manual del Notario nicaragüense, Ley del Notariado y Código Civil); `{CAMPOS}` automáticos y `[CAMPOS]` a mano |
+| `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md` |
 | `js/firmas.js` | Diálogo de bloques de firma |
 
 ## Comandos
