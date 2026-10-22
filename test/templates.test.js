@@ -42,3 +42,19 @@ test('todas las plantillas se arman sin claves sueltas y solo con etiquetas perm
   }
   assert.match(build(PLANTILLAS.find((t) => t.id === 'cierre-testimonio'), notario, d), /Protocolo número DOCE \(12\) que llevo durante el año dos mil veintiséis/);
 });
+
+test('campos: cómo se escribe cada dato', () => {
+  const { fieldKind: k, fieldText: t } = require('../js/templates.js');
+  const put = (label, v) => t(k(label), v);
+  assert.strictEqual(put('NÚMERO DE CÉDULA', '001-01A'), 'cero, cero, uno, guion, cero, uno, letra A');
+  assert.strictEqual(put('NÚMERO DE CARNÉ', '12345'), 'doce mil trescientos cuarenta y cinco (12345)');
+  assert.strictEqual(put('PRECIO EN LETRAS', '1,500'), 'mil quinientos');
+  assert.strictEqual(put('TOMO', '45'), 'cuarenta y cinco (45)');
+  assert.strictEqual(put('NÚMERO DE FINCA', '12-A'), 'uno, dos, guion, letra A (12-A)');
+  assert.strictEqual(put('PORCENTAJE', '51'), 'cincuenta y uno por ciento (51 %)');
+  assert.strictEqual(put('FECHA EN LETRAS', '2026-10-01'), 'primero de octubre del año dos mil veintiséis');
+  assert.strictEqual(put('HORA EN LETRAS', '13:05'), 'la una y cinco minutos de la tarde');
+  assert.strictEqual(put('NOMBRE DEL VENDEDOR', ' Ana Ruiz '), 'Ana Ruiz');
+  assert.strictEqual(put('NÚMERO Y MONTO DE LAS CUOTAS', 'doce'), 'doce');
+  assert.strictEqual(put('FECHA EN LETRAS', ''), '');
+});

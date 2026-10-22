@@ -127,6 +127,8 @@ const Editor = (() => {
 
   // ---------- normalización ----------
   const BLOCKS = /^(DIV|H[1-6]|LI|BLOCKQUOTE|PRE|SECTION|ARTICLE|UL|OL|TABLE|TR|TD)$/;
+  const WHITE = '#ffffff';
+  const isWhite = (c) => /^\s*(#fff(fff)?|white|rgba?\(255,\s*255,\s*255(,\s*1)?\))\s*$/i.test(c || '');
 
   function normalize(ed) {
     let wrap = null;
@@ -152,11 +154,17 @@ const Editor = (() => {
       if (el.nodeName === 'P') { const a = el.style.textAlign; el.removeAttribute('style'); if (a) el.style.textAlign = a; continue; }
       // Al quitar un formato, Chrome deja los demás como style (<u style="font-weight: bold">): se pasan a etiquetas.
       const st = el.style;
-      const tags = [/^(bold|bolder|[6-9]00)$/.test(st.fontWeight) && 'b', st.fontStyle === 'italic' && 'i', /underline/.test(st.textDecorationLine) && 'u'].filter(Boolean);
+      const tags = [/^(bold|bolder|[6-9]00)$/.test(st.fontWeight) && 'b', st.fontStyle === 'italic' && 'i', /underline/.test(st.textDecorationLine) && 'u', isWhite(st.color) && 'font'].filter(Boolean);
       el.removeAttribute('style');
-      for (const t of tags) { const w = document.createElement(t); w.append(...el.childNodes); el.append(w); }
+      for (const t of tags) { const w = document.createElement(t); if (t === 'font') w.setAttribute('color', WHITE); w.append(...el.childNodes); el.append(w); }
     }
-    for (const el of ed.querySelectorAll('font, span:not([class])')) el.replaceWith(...el.childNodes);
+    // El texto es negro o blanco (<font color="#ffffff">); cualquier otro color vuelve al negro.
+    for (const el of ed.querySelectorAll('font')) {
+      if (!isWhite(el.getAttribute('color'))) { el.replaceWith(...el.childNodes); continue; }
+      for (const a of [...el.attributes]) el.removeAttribute(a.name);
+      el.setAttribute('color', WHITE);
+    }
+    for (const el of ed.querySelectorAll('span:not([class])')) el.replaceWith(...el.childNodes);
     // Un campo de plantilla [ASÍ] deja de resaltarse en cuanto se escribe el dato.
     for (const el of ed.querySelectorAll('span.campo')) if (!/^\[[^\]]*\]$/.test(el.textContent)) el.replaceWith(...el.childNodes);
     fixFirmas(ed);
@@ -512,6 +520,7 @@ const Editor = (() => {
         if (fmt.u) h = `<u>${h}</u>`;
         if (fmt.i) h = `<i>${h}</i>`;
         if (fmt.b) h = `<b>${h}</b>`;
+        if (fmt.w) h = `<font color="${WHITE}">${h}</font>`;
         cur.html += h;
         return;
       }
@@ -524,6 +533,7 @@ const Editor = (() => {
         b: st.fontWeight ? /^(bold|bolder|[6-9]00)$/.test(st.fontWeight) : fmt.b || tag === 'B' || tag === 'STRONG',
         i: st.fontStyle ? st.fontStyle === 'italic' : fmt.i || tag === 'I' || tag === 'EM',
         u: fmt.u || tag === 'U' || /underline/.test(st.textDecoration || ''),
+        w: st.color ? isWhite(st.color) : fmt.w || (tag === 'FONT' && isWhite(node.getAttribute('color'))),
       };
       const block = BLOCK_SRC.test(tag);
       const a = block ? (st.textAlign || node.getAttribute('align') || '').toLowerCase() : align;
@@ -759,6 +769,8 @@ const Editor = (() => {
     const s = getSelection();
     const inEd = s.rangeCount > 0 && root.contains(s.anchorNode) && !!hostOf(s.anchorNode);
     for (const cmd of TOGGLES) document.querySelector(`.toolbar [data-cmd="${cmd}"]`)?.setAttribute('aria-pressed', inEd && document.queryCommandState(cmd));
+    const white = inEd && isWhite(document.queryCommandValue('foreColor'));
+    for (const b of document.querySelectorAll('.toolbar [data-cmd="foreColor"]')) b.setAttribute('aria-pressed', inEd && isWhite(b.dataset.value) === white);
   }
 
   function format(cmd, value) {
@@ -767,9 +779,9 @@ const Editor = (() => {
     if (spansPages()) { ctx.status('Para dar formato, seleccione texto dentro de una misma página'); return; }
     // Sin selección, el navegador guarda el estilo para lo que se escriba después; mover el cursor (los
     // marcadores de reflow o de una instantánea) lo borraría, así que no se toca nada más.
-    if (sel.isCollapsed && TOGGLES.includes(cmd)) {
+    if (sel.isCollapsed && (TOGGLES.includes(cmd) || cmd === 'foreColor')) {
       if (!keepStyle) snapshot();
-      document.execCommand(cmd);
+      document.execCommand(cmd, false, value);
       keepStyle = true;
       syncButtons();
       return;
@@ -861,6 +873,22 @@ const Editor = (() => {
     ed.focus({ preventScroll: true });
     sel.removeAllRanges();
     sel.addRange(c);
+    reflow(Math.max(0, eds.indexOf(ed) - 1));
+  }
+
+  // Cambia el documento con fn (p. ej. llenar un campo) en un solo paso de deshacer; fn devuelve el nodo tras el
+  // que queda el cursor.
+  function edit(fn) {
+    snapshot();
+    lastGroup = '';
+    const node = fn();
+    const ed = hostOf(node);
+    if (!ed) return;
+    const r = document.createRange();
+    r.setStartAfter(node);
+    ed.focus({ preventScroll: true });
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
     reflow(Math.max(0, eds.indexOf(ed) - 1));
   }
 
@@ -978,6 +1006,7 @@ const Editor = (() => {
       const font = `${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
       cx.font = font;
       cx.letterSpacing = st.letterSpacing === 'normal' ? '0px' : st.letterSpacing;
+      cx.fillStyle = st.color;
       const up = domAscent(font);
       const put = (s, a) => {
         range.setStart(t, a);
@@ -1022,7 +1051,6 @@ const Editor = (() => {
       const k = pr.width / g.width; // px de pantalla por pt
       cx.scale(PRINT_SCALE / k, PRINT_SCALE / k);
       cx.translate(-pr.left, -pr.top);
-      cx.fillStyle = '#000';
       // Mismos recortes que en pantalla: el área de texto (clip-path) y cada guion (overflow: hidden).
       for (const [el, box, dx, dy] of [[eds[i], eds[i].parentNode, 6, 2], ...[...page.querySelectorAll('.dash')].map((d) => [d, d, 0, 0])]) {
         const b = box.getBoundingClientRect();
@@ -1040,7 +1068,7 @@ const Editor = (() => {
   }
 
   return {
-    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml,
+    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml, edit,
     pagesHtml: () => eds.map((e) => e.innerHTML),
     pageCount: () => eds.length,
     paperForPage: paperFor,

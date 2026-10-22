@@ -60,7 +60,21 @@
     return d.getMonth() === Number(m[2]) - 1 ? dateToWords(d) : '';
   }
 
-  const api = { numberToWords, dateToWords, timeToWords, dateTimeToWords, isoDateToWords };
+  // "001-01A" → "cero, cero, uno, guion, cero, uno, letra A": cédulas, placas y motores se leen carácter por carácter.
+  const SIGNS = { '-': 'guion', '/': 'barra', '.': 'punto' };
+  const spellCode = (s) => [...String(s).replace(/\s+/g, '')]
+    .map((c) => (/\d/.test(c) ? UNITS[c] : /\p{L}/u.test(c) ? 'letra ' + c.toLocaleUpperCase('es') : SIGNS[c] || c)).join(', ');
+
+  // "1,500.75" → "mil quinientos punto setenta y cinco" (la coma separa miles); null si no es un número.
+  function amountToWords(s) {
+    const m = /^(\d{1,12})(?:\.(\d{1,6}))?$/.exec(String(s).replace(/[,\s]/g, ''));
+    if (!m) return null;
+    if (!m[2]) return numberToWords(Number(m[1]));
+    const dec = m[2].startsWith('0') ? [...m[2]].map((d) => UNITS[d]).join(' ') : numberToWords(Number(m[2]));
+    return `${numberToWords(Number(m[1]))} punto ${dec}`;
+  }
+
+  const api = { numberToWords, dateToWords, timeToWords, dateTimeToWords, isoDateToWords, spellCode, amountToWords };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PS_WORDS = api;
 })(this);

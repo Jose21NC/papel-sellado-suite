@@ -471,7 +471,7 @@
     const cmd = b.dataset.cmd;
     if (cmd === 'undo') Editor.undo();
     else if (cmd === 'redo') Editor.redo();
-    else Editor.format(cmd);
+    else Editor.format(cmd, b.dataset.value);
   });
 
   $('#btn-datos').addEventListener('click', () => $('#dlg-datos').showModal());
@@ -679,16 +679,18 @@
   });
 
   // El respaldo viene de un archivo: se valida y el HTML de los trabajos se limpia antes de guardarlo.
-  // SPAN solo como mitad de firma (f2) o campo de plantilla (campo); P puede ser línea de firma (class="firma").
-  const ALLOWED = new Set(['P', 'B', 'I', 'U', 'BR', 'SPAN']);
+  // SPAN solo como mitad de firma (f2) o campo de plantilla (campo); P puede ser línea de firma (class="firma");
+  // FONT solo para el texto blanco.
+  const ALLOWED = new Set(['P', 'B', 'I', 'U', 'BR', 'SPAN', 'FONT']);
   function cleanStored(html) {
     const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
     const rootEl = doc.body.firstChild;
     for (const el of [...rootEl.querySelectorAll('*')].reverse()) {
       if (/^(SCRIPT|STYLE|TEMPLATE|IFRAME|OBJECT)$/.test(el.nodeName)) { el.remove(); continue; }
-      if (!ALLOWED.has(el.nodeName) || (el.nodeName === 'SPAN' && !/^(f2|campo)$/.test(el.getAttribute('class') || ''))) { el.replaceWith(...el.childNodes); continue; }
+      if (!ALLOWED.has(el.nodeName) || (el.nodeName === 'SPAN' && !/^(f2|campo)$/.test(el.getAttribute('class') || '')) ||
+        (el.nodeName === 'FONT' && el.getAttribute('color') !== '#ffffff')) { el.replaceWith(...el.childNodes); continue; }
       for (const a of [...el.attributes]) {
-        const keep = el.nodeName === 'SPAN' ? a.name === 'class'
+        const keep = el.nodeName === 'SPAN' ? a.name === 'class' : el.nodeName === 'FONT' ? a.name === 'color'
           : el.nodeName === 'P' && (a.name === 'data-cont' || a.name === 'data-split' || (a.name === 'class' && a.value === 'firma') || (a.name === 'style' && /^text-align:\s*(left|center|right|justify);?$/.test(a.value.trim())));
         if (!keep) el.removeAttribute(a.name);
       }

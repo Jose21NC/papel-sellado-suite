@@ -103,6 +103,10 @@
             <button class="btn small" data-cmd="justifyRight" aria-label="Alinear a la derecha" title="Alinear a la derecha"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.5h8M2 10h12M6 13.5h8"/></svg></button>
             <button class="btn small" data-cmd="justifyFull" aria-label="Justificar" title="Justificar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h12"/></svg></button>
           </div>
+          <div class="group seg" role="group" aria-label="Color del texto">
+            <button class="btn small" data-cmd="foreColor" data-value="#000000" aria-pressed="false" title="Texto negro">Negro</button>
+            <button class="btn small" data-cmd="foreColor" data-value="#ffffff" aria-pressed="false" title="Texto blanco: se imprime sin tinta (en pantalla se ve con un borde gris)">Blanco</button>
+          </div>
           <div class="group">
             <select id="ed-font" aria-label="Tipo de letra"></select>
             <label>Tamaño <input type="number" id="ed-size" min="8" max="16" step="0.5" aria-label="Tamaño de letra (pt)"></label>
@@ -199,6 +203,17 @@
       <h2 id="pdf-title">Descargar PDF</h2>
       <p class="hint" style="margin:0">Un PDF tamaño legal (8.5 × 14 pulg.) a 300 ppp. Ábralo e imprímalo en papel legal a tamaño real (100 %).</p>
       <div class="buttons"><button class="btn primary" value="fondo">Con papel</button><button class="btn" value="texto">Solo texto</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-campo" aria-labelledby="campo-title">
+    <form method="dialog">
+      <h2 id="campo-title"></h2>
+      <p class="hint" id="campo-hint" style="margin:0"></p>
+      <div class="campo-opts" id="campo-opts"></div>
+      <input type="text" id="campo-input" autocomplete="off" aria-labelledby="campo-title">
+      <p class="campo-out" id="campo-out" aria-live="polite"></p>
+      <div class="buttons"><button class="btn primary" value="ok">Poner</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
     </form>
   </dialog>
 
