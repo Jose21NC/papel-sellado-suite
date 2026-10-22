@@ -1,6 +1,6 @@
 # Guía para agentes (Claude Code, Codex, Gemini, Cursor, etc.)
 
-Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben el papel sellado digital de la DGI (PDF), escriben sobre sus renglones e imprimen con o sin el papel de fondo. Publicada en GitHub Pages desde `main`: https://jose21nc.github.io/papel-sellado-suite/
+Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de Nicaragua. Suben el papel sellado digital de la DGI (PDF), escriben sobre sus renglones e imprimen con o sin el papel de fondo. Publicada en https://lexia-suite.cloud (Hostinger, desplegada por Git desde `main`; ver `PUBLICAR.md`). Los identificadores internos conservan el nombre anterior (`papel-sellado-suite`: base IndexedDB, bloqueo de pestaña, `app` del respaldo) para no perder datos ni respaldos.
 
 ## Reglas del proyecto
 - HTML, CSS y JavaScript sin compilación, sin frameworks y sin dependencias. pdf.js 3.11 está incluido en `vendor/` y corre en el hilo principal para que `index.html` funcione también con doble clic (file://). Scripts clásicos, no módulos.
@@ -8,7 +8,7 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 - El cambio más pequeño que resuelva todo. No agregar opciones ni código "para después".
 - **La geometría de impresión es sagrada.** Las páginas miden 612×1008 pt (legal) y el texto debe caer sobre los 30 renglones de la DGI. No tocar sin necesidad: `.page`, `.area`, `.seal`, `.ed` (y sus `p`), `.dash`, `.rule`, `p.firma`, `.f2`, `@page` ni el bloque `@media print` de `css/app.css`.
 - HTML de un trabajo: `p` (alineación, `firma`), `b`, `i`, `u`, `br`, `span.f2`, `span.campo`. Todo HTML que se guarde en un trabajo debe estar permitido en `normalize()` (editor), en `sanitize()` si debe sobrevivir al pegar, y en `cleanStored()` (importar respaldo, `js/app.js`).
-- Los datos viven en IndexedDB (una base por cuenta) y, si `js/firebase-config.js` está lleno, también en Firebase (`js/cloud.js`, ver `FIREBASE.md`): todo cambio pasa por `DB.put/putMany/del`, que lo anota en la cola `outbox`; escrituras que vienen de la nube usan `local = true`. Sin configuración la suite funciona sin cuenta. Nunca subir al repo PDFs ni protocolos .docx reales: traen datos personales (`*.pdf`, `*.docx` y `local/` están en `.gitignore`; las pruebas usan documentos sintéticos).
+- Los datos viven en IndexedDB (una base por cuenta) y, si `js/firebase-config.js` está lleno, también en Firebase (`js/cloud.js`, ver `FIREBASE.md`): todo cambio pasa por `DB.put/putMany/del`, que lo anota en la cola `outbox`; escrituras que vienen de la nube usan `local = true`. Sin configuración Lexia funciona sin cuenta. Nunca subir al repo PDFs ni protocolos .docx reales: traen datos personales (`*.pdf`, `*.docx` y `local/` están en `.gitignore`; las pruebas usan documentos sintéticos).
 
 ## Mapa del código
 | Archivo | Qué hace |
@@ -25,14 +25,14 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
 | `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md`. Un clic en un campo `[ASÍ]` abre `#dlg-campo`: `fieldKind`/`fieldText` (con pruebas) deciden cómo se escribe el dato |
 | `js/firmas.js` | Diálogo de bloques de firma |
-| `js/docx.js` | Lee un .docx sin dependencias (ZIP con `DecompressionStream`) y pasa sus párrafos al HTML de la suite (pruebas con `test/fixtures/protocolo-prueba.docx`, sintético) |
+| `js/docx.js` | Lee un .docx sin dependencias (ZIP con `DecompressionStream`) y pasa sus párrafos al HTML de Lexia (pruebas con `test/fixtures/protocolo-prueba.docx`, sintético) |
 
 ## Comandos
 ```bash
 npm test                         # pruebas (node --test)
 npm run serve                    # http://localhost:8000
 ```
-No hay paso de compilación: publicar es `git push` a `main` (GitHub Pages tarda unos minutos).
+No hay paso de compilación: publicar es `git push` a `main` (Hostinger lo despliega si está activada la implementación automática; ver `PUBLICAR.md`). `.htaccess` fuerza HTTPS, evita copias viejas en caché y oculta `.git`.
 
 ## Cómo verificar cambios
 1. `npm test`.

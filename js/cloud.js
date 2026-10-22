@@ -43,6 +43,7 @@
     TOO_MANY_ATTEMPTS_TRY_LATER: 'Demasiados intentos: espere unos minutos.',
     USER_DISABLED: 'Esta cuenta está desactivada.',
     OPERATION_NOT_ALLOWED: 'En Firebase falta activar el acceso con correo y contraseña.',
+    CONFIGURATION_NOT_FOUND: 'En Firebase falta activar Authentication (correo y contraseña).',
     TOKEN_EXPIRED: 'Su sesión venció: cierre sesión y vuelva a entrar.',
     INVALID_REFRESH_TOKEN: 'Su sesión venció: cierre sesión y vuelva a entrar.',
     USER_NOT_FOUND: 'La cuenta ya no existe.',

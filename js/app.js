@@ -106,7 +106,7 @@
 
   function renderPerfil() {
     const u = Cloud.user(), st = Cloud.status;
-    $('#cuenta-info').textContent = u ? u.email : 'Esta copia de la suite no tiene Firebase configurado: todo se guarda solo en este navegador.';
+    $('#cuenta-info').textContent = u ? u.email : 'Esta copia de Lexia no tiene Firebase configurado: todo se guarda solo en este navegador.';
     $('#cuenta-sync').textContent = !u ? '' : st.pending ? `${st.pending} cambio${st.pending === 1 ? '' : 's'} por subir a su cuenta.${st.error ? ' ' + st.error : ''}` : 'Todo está guardado en su cuenta.';
     $('#btn-logout').hidden = !u;
     const p = Profile.get();
@@ -163,7 +163,7 @@
       await Cloud.pull();
     } catch (err) {
       if (err.code) { Cloud.signOut(); await login(); return openAccount(); } // la sesión ya no vale
-      toast('Sin conexión con su cuenta: se muestra lo guardado en este navegador.');
+      toast(err.offline ? 'Sin conexión con su cuenta: se muestra lo guardado en este navegador.' : `No se pudo abrir su cuenta (${err.message}). Se muestra lo guardado en este navegador.`);
       return;
     }
     // La primera vez, lo que ya había en este navegador (sin cuenta) se puede pasar a la cuenta.
@@ -305,7 +305,7 @@
       await DB.put('papers', p);
       renderPapers();
     } else if (act === 'delete') {
-      if (!(await confirmDialog('Eliminar papel', `Se borrará la hoja ${p.serie || ''} Nº ${p.numero || ''} de la suite. El PDF original en su computadora no se toca.`, 'Eliminar', true))) return;
+      if (!(await confirmDialog('Eliminar papel', `Se borrará la hoja ${p.serie || ''} Nº ${p.numero || ''} de Lexia. El PDF original en su computadora no se toca.`, 'Eliminar', true))) return;
       await DB.del('papers', p.id);
       state.papers = state.papers.filter((x) => x.id !== p.id);
       if (!state.papers.some((x) => x.fileId === p.fileId)) { await DB.del('files', p.fileId); state.files.delete(p.fileId); PDF.forget(p.fileId); }
@@ -847,7 +847,7 @@
     if (state.work === job.w) { $('#ed-state').value = job.w.status; renderLog(); syncHide(); Editor.refreshPrinted(); }
   }
   $('#btn-print-fondo').addEventListener('click', () => print('fondo'));
-  // Ctrl+P en el editor usa la impresión de la suite (con papel si hay papel asignado).
+  // Ctrl+P en el editor usa la impresión de Lexia (con papel si hay papel asignado).
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p' && !$('#view-editor').hidden) {
       e.preventDefault();
@@ -904,7 +904,7 @@
     const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `respaldo-papel-sellado-${now().slice(0, 10)}.json`;
+    a.download = `respaldo-lexia-${now().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     toast(`Respaldo descargado: ${out.works.length} trabajos, ${out.papers.length} hojas.`);
@@ -938,7 +938,7 @@
     if (!file) return;
     let data;
     try { data = JSON.parse(await file.text()); } catch { toast('El archivo no es un respaldo válido'); return; }
-    if (data?.app !== 'papel-sellado-suite' || !Array.isArray(data.works) || !Array.isArray(data.papers) || !Array.isArray(data.files)) { toast('El archivo no es un respaldo de Papel Sellado Suite'); return; }
+    if (data?.app !== 'papel-sellado-suite' || !Array.isArray(data.works) || !Array.isArray(data.papers) || !Array.isArray(data.files)) { toast('El archivo no es un respaldo de Lexia'); return; }
     if (!(await confirmDialog('Importar respaldo', `Se importarán ${data.works.length} trabajos y ${data.papers.length} hojas${data.profile ? ', y sus datos de «Mis datos»' : ''}. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
     try {
       const files = [];
@@ -1010,10 +1010,10 @@
       navigator.locks.request('papel-sellado-suite', { ifAvailable: true }, (lock) => { resolve(!!lock); return lock ? new Promise(() => {}) : null; });
     });
     if (!alone) {
-      document.querySelector('main').innerHTML = '<div class="empty">La suite ya está abierta en otra pestaña o ventana. Use esa, o ciérrela y recargue esta página, para no sobrescribir sus trabajos.</div>';
+      document.querySelector('main').innerHTML = '<div class="empty">Lexia ya está abierta en otra pestaña o ventana. Use esa, o ciérrela y recargue esta página, para no sobrescribir sus trabajos.</div>';
       return;
     }
-    // Con Firebase configurado, la suite pide cuenta; sin configurar, todo queda en este navegador como antes.
+    // Con Firebase configurado, Lexia pide cuenta; sin configurar, todo queda en este navegador como antes.
     if (Cloud.enabled) {
       if (!Cloud.resume()) await login();
       await openAccount();

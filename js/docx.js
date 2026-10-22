@@ -1,5 +1,5 @@
 // Lectura de un .docx (Word) para importar el protocolo: abre el ZIP con DecompressionStream y pasa los
-// párrafos de word/document.xml al HTML de la suite. Sin dependencias: corre en el navegador (PS_DOCX) y en Node.
+// párrafos de word/document.xml al HTML de Lexia. Sin dependencias: corre en el navegador (PS_DOCX) y en Node.
 (function (root) {
   // Archivos del ZIP: { nombre: Uint8Array }. Solo métodos 0 (guardado) y 8 (deflate), los que usa Word.
   async function unzip(buf) {

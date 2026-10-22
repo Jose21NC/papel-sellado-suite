@@ -1,0 +1,11 @@
+# Hostinger (Apache/LiteSpeed): siempre por HTTPS, sin copias viejas de la app después de publicar cambios
+# y sin exponer la carpeta .git que deja el despliegue por Git.
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RedirectMatch 404 /\.git
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
