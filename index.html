@@ -9,15 +9,17 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"></span> Papel Sellado Suite</div>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span> Papel Sellado Suite</div>
     <nav class="tabs" aria-label="Secciones">
       <button class="tab" data-route="trabajos">Mis trabajos</button>
       <button class="tab" data-route="papel">Papel sellado</button>
     </nav>
     <div class="spacer"></div>
-    <button class="btn small" id="btn-profile" title="Sus datos de abogado o notario, para llenar las plantillas">Mis datos</button>
-    <button class="btn small" id="btn-export" title="Descarga un archivo con todos sus trabajos y papeles">Exportar respaldo</button>
-    <button class="btn small" id="btn-import" title="Restaura un respaldo exportado antes">Importar respaldo</button>
+    <div class="top-actions">
+      <button class="btn small quiet" id="btn-profile" title="Sus datos de abogado o notario, para llenar las plantillas">Mis datos</button>
+      <button class="btn small quiet" id="btn-export" title="Descarga un archivo con todos sus trabajos y papeles">Exportar respaldo</button>
+      <button class="btn small quiet" id="btn-import" title="Restaura un respaldo exportado antes">Importar respaldo</button>
+    </div>
   </header>
 
   <main>
@@ -73,41 +75,46 @@
     <!-- Editor -->
     <section id="view-editor" hidden>
       <div class="toolbar">
-        <div class="group">
-          <button class="btn small" data-route="trabajos" title="Volver a mis trabajos">← Trabajos</button>
-          <input type="text" id="ed-title" aria-label="Título del trabajo" placeholder="Título del trabajo">
-          <span class="status" id="ed-status" role="status"></span>
-          <button class="btn small" id="btn-datos" aria-haspopup="dialog" title="Cliente, papel, ajustes del texto, impresora e historial">Datos del trabajo</button>
+        <div class="toolbar-row">
+          <div class="group">
+            <button class="btn small quiet back" data-route="trabajos" title="Volver a mis trabajos"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>Trabajos</button>
+            <input type="text" id="ed-title" aria-label="Título del trabajo" placeholder="Título del trabajo">
+            <span class="status" id="ed-status" role="status"></span>
+            <button class="btn small" id="btn-datos" aria-haspopup="dialog" title="Cliente, papel, ajustes del texto, impresora e historial">Datos del trabajo</button>
+          </div>
+          <div class="spacer"></div>
+          <div class="group">
+            <button class="btn small" id="btn-print-texto" title="Imprime solo el texto, para papel sellado ya impreso">Imprimir solo texto</button>
+            <button class="btn small primary" id="btn-print-fondo" title="Imprime el papel sellado completo con el texto encima">Imprimir con papel</button>
+          </div>
         </div>
-        <div class="group" aria-label="Formato">
-          <button class="btn small" data-cmd="bold" aria-pressed="false" aria-label="Negrita" title="Negrita (Ctrl+B)"><b>N</b></button>
-          <button class="btn small" data-cmd="italic" aria-pressed="false" aria-label="Cursiva" title="Cursiva (Ctrl+I)"><i>K</i></button>
-          <button class="btn small" data-cmd="underline" aria-pressed="false" aria-label="Subrayado" title="Subrayado (Ctrl+U)"><u>S</u></button>
-          <button class="btn small" data-cmd="upper" title="Convertir a MAYÚSCULAS">AA</button>
-          <button class="btn small" data-cmd="lower" title="Convertir a minúsculas">aa</button>
-        </div>
-        <div class="group" aria-label="Alineación">
-          <button class="btn small" data-cmd="justifyLeft" aria-label="Alinear a la izquierda" title="Alinear a la izquierda"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h8"/></svg></button>
-          <button class="btn small" data-cmd="justifyCenter" aria-label="Centrar" title="Centrar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M4 6.5h8M2 10h12M4 13.5h8"/></svg></button>
-          <button class="btn small" data-cmd="justifyRight" aria-label="Alinear a la derecha" title="Alinear a la derecha"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.5h8M2 10h12M6 13.5h8"/></svg></button>
-          <button class="btn small" data-cmd="justifyFull" aria-label="Justificar" title="Justificar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h12"/></svg></button>
-        </div>
-        <div class="group">
-          <select id="ed-font" aria-label="Tipo de letra"></select>
-          <label>Tamaño <input type="number" id="ed-size" min="8" max="16" step="0.5" aria-label="Tamaño de letra (pt)"></label>
-        </div>
-        <div class="group" aria-label="Plantillas y firmas">
-          <button class="btn small" id="btn-templates" title="Insertar un modelo de escritura, acta o cláusula">Plantillas</button>
-          <button class="btn small" id="btn-firmas" title="Insertar firmas: renglón en blanco para firmar, nombre y calidad">Firmas</button>
-        </div>
-        <div class="group">
-          <button class="btn small" data-cmd="undo" aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 2 6l3 3M2 6h7.5a3.5 3.5 0 0 1 0 7H6"/></svg></button>
-          <button class="btn small" data-cmd="redo" aria-label="Rehacer" title="Rehacer (Ctrl+Shift+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m11 3 3 3-3 3m3-3H6.5a3.5 3.5 0 0 0 0 7H10"/></svg></button>
+        <div class="toolbar-row tools">
+          <div class="group seg" role="group" aria-label="Formato">
+            <button class="btn small" data-cmd="bold" aria-pressed="false" aria-label="Negrita" title="Negrita (Ctrl+B)"><b>N</b></button>
+            <button class="btn small" data-cmd="italic" aria-pressed="false" aria-label="Cursiva" title="Cursiva (Ctrl+I)"><i>K</i></button>
+            <button class="btn small" data-cmd="underline" aria-pressed="false" aria-label="Subrayado" title="Subrayado (Ctrl+U)"><u>S</u></button>
+            <button class="btn small" data-cmd="upper" title="Convertir a MAYÚSCULAS">AA</button>
+            <button class="btn small" data-cmd="lower" title="Convertir a minúsculas">aa</button>
+          </div>
+          <div class="group seg" role="group" aria-label="Alineación">
+            <button class="btn small" data-cmd="justifyLeft" aria-label="Alinear a la izquierda" title="Alinear a la izquierda"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h8"/></svg></button>
+            <button class="btn small" data-cmd="justifyCenter" aria-label="Centrar" title="Centrar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M4 6.5h8M2 10h12M4 13.5h8"/></svg></button>
+            <button class="btn small" data-cmd="justifyRight" aria-label="Alinear a la derecha" title="Alinear a la derecha"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.5h8M2 10h12M6 13.5h8"/></svg></button>
+            <button class="btn small" data-cmd="justifyFull" aria-label="Justificar" title="Justificar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h12"/></svg></button>
+          </div>
+          <div class="group">
+            <select id="ed-font" aria-label="Tipo de letra"></select>
+            <label>Tamaño <input type="number" id="ed-size" min="8" max="16" step="0.5" aria-label="Tamaño de letra (pt)"></label>
+          </div>
+          <div class="group seg" role="group" aria-label="Plantillas y firmas">
+            <button class="btn small" id="btn-templates" title="Insertar un modelo de escritura, acta o cláusula">Plantillas</button>
+            <button class="btn small" id="btn-firmas" title="Insertar firmas: renglón en blanco para firmar, nombre y calidad">Firmas</button>
+          </div>
+          <div class="group seg" role="group" aria-label="Deshacer y rehacer">
+            <button class="btn small" data-cmd="undo" aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 2 6l3 3M2 6h7.5a3.5 3.5 0 0 1 0 7H6"/></svg></button>
+            <button class="btn small" data-cmd="redo" aria-label="Rehacer" title="Rehacer (Ctrl+Shift+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m11 3 3 3-3 3m3-3H6.5a3.5 3.5 0 0 0 0 7H10"/></svg></button>
+          </div>
           <button class="btn small" id="btn-bg" aria-pressed="true" title="Mostrar u ocultar el papel sellado en pantalla">Ver papel</button>
-        </div>
-        <div class="group">
-          <button class="btn small primary" id="btn-print-fondo" title="Imprime el papel sellado completo con el texto encima">Imprimir con papel</button>
-          <button class="btn small" id="btn-print-texto" title="Imprime solo el texto, para papel sellado ya impreso">Imprimir solo texto</button>
         </div>
       </div>
       <div class="pages" id="pages"></div>
@@ -211,6 +218,7 @@
   <dialog id="dlg-welcome" aria-labelledby="welcome-title">
     <form method="dialog">
       <section data-step="1">
+        <span class="brand-mark big" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span>
         <h2 id="welcome-title" tabindex="-1">Le damos la bienvenida a Papel Sellado Suite</h2>
         <p>Escriba escrituras y testimonios directamente sobre el papel sellado digital de la DGI e imprímalos alineados con sus 30 renglones.</p>
         <p class="hint">Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
