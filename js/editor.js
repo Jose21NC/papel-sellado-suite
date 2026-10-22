@@ -604,6 +604,7 @@ const Editor = (() => {
   function onBeforeInput(e) {
     if (!e.target.closest?.('.ed')) return;
     if (spansPages()) { e.preventDefault(); return; }
+    if (e.inputType.startsWith('format')) return; // viene de format(), que ya tomó su instantánea
     if (e.inputType === 'historyUndo') { e.preventDefault(); undo(); return; }
     if (e.inputType === 'historyRedo') { e.preventDefault(); redo(); return; }
     if (e.inputType === 'insertLineBreak') { e.preventDefault(); snapshot(); document.execCommand('insertParagraph'); return; }
