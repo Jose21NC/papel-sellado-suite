@@ -40,7 +40,5 @@ No hay paso de compilación: publicar es `git push` a `main` (GitHub Pages tarda
 
 ## Estado y pendientes conocidos
 - Sin probar en Safari ni Firefox.
-- En el celular la barra del editor se desplaza de lado.
-- Arrastrar texto dentro del documento copia en vez de mover.
-- Editar dentro de una línea de dos firmas (p. ej. Enter en medio) puede dejar marcado raro.
+- En el celular la barra del editor se desplaza de lado (a propósito: no cabe en una fila).
 - Plantillas: son modelos; la base legal de la frase del quinquenio y los requisitos actuales de Migración para menores no se verificaron.

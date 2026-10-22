@@ -159,6 +159,7 @@ const Editor = (() => {
     for (const el of ed.querySelectorAll('font, span:not([class])')) el.replaceWith(...el.childNodes);
     // Un campo de plantilla [ASÍ] deja de resaltarse en cuanto se escribe el dato.
     for (const el of ed.querySelectorAll('span.campo')) if (!/^\[[^\]]*\]$/.test(el.textContent)) el.replaceWith(...el.childNodes);
+    fixFirmas(ed);
     const ps = ed.children;
     for (let k = 0; k < ps.length; k++) {
       const p = ps[k];
@@ -166,6 +167,54 @@ const Editor = (() => {
       if (k < ps.length - 1) p.removeAttribute('data-split');
       if (!p.textContent && !p.querySelector('br')) p.append(document.createElement('br'));
     }
+  }
+
+  // Una línea de firmas lleva una firma o dos mitades (.f2). Editar puede dejar mitades sueltas o de más
+  // (que no caben en el renglón): se reparten de dos en dos y una mitad sola vuelve a ser texto.
+  function fixFirmas(ed) {
+    const unwrap = (s) => {
+      const prev = s.previousSibling;
+      const space = prev && /\S$/.test(prev.textContent) && /^\S/.test(s.textContent);
+      s.replaceWith(...(space ? [' '] : []), ...s.childNodes);
+    };
+    for (const s of ed.querySelectorAll('.f2')) if (!s.parentNode.matches('p.firma')) unwrap(s);
+    for (const p of ed.querySelectorAll('p.firma')) {
+      const halves = [...p.children].filter((c) => c.classList.contains('f2'));
+      let at = p;
+      for (let k = 2; k < halves.length; k += 2) {
+        const line = p.cloneNode(false);
+        line.append(...halves.slice(k, k + 2));
+        at.after(line);
+        at = line;
+      }
+    }
+    for (const p of ed.querySelectorAll('p.firma')) {
+      const halves = [...p.children].filter((c) => c.classList.contains('f2'));
+      if (halves.length === 1) unwrap(halves[0]);
+    }
+  }
+
+  // Enter en una línea de dos firmas no parte las mitades: abre un renglón antes (al inicio) o después.
+  function enterInPair() {
+    const s = getSelection();
+    const p = s.rangeCount && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode).closest?.('p.firma');
+    if (!p || !p.querySelector(':scope > .f2')) return false;
+    snapshot();
+    const probe = document.createRange();
+    probe.selectNodeContents(p);
+    probe.setEnd(s.anchorNode, s.anchorOffset);
+    const before = s.isCollapsed && probe.toString() === '';
+    // Igual que al final de un bloque de firmas: dentro del bloque es otro renglón para firmar; al final, texto.
+    const line = document.createElement('p');
+    if (before || p.nextElementSibling?.classList.contains('firma')) line.className = 'firma';
+    line.append(document.createElement('br'));
+    if (before) p.before(line); else p.after(line);
+    const r = document.createRange();
+    r.setStart(before ? p : line, 0);
+    s.removeAllRanges();
+    s.addRange(r);
+    reflow(eds.indexOf(hostOf(p)) - 1);
+    return true;
   }
 
   // Une el último párrafo de `a` con el primero de `b` cuando son el mismo párrafo partido entre páginas.
@@ -325,6 +374,7 @@ const Editor = (() => {
     range.setStartBefore(s);
     if (e && e.closest('.ed') === ed) range.setEndBefore(e); else range.collapse(true);
     s.remove(); e?.remove();
+    ed.normalize(); // une el texto que partieron los marcadores (el rango se ajusta solo)
     if (document.activeElement !== ed) ed.focus({ preventScroll: true });
     const sel = getSelection();
     sel.removeAllRanges();
@@ -613,6 +663,7 @@ const Editor = (() => {
     if (e.inputType.startsWith('format')) return; // viene de format(), que ya tomó su instantánea
     if (e.inputType === 'historyUndo') { e.preventDefault(); undo(); return; }
     if (e.inputType === 'historyRedo') { e.preventDefault(); redo(); return; }
+    if ((e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') && enterInPair()) { e.preventDefault(); lastGroup = ''; return; }
     if (e.inputType === 'insertLineBreak') { e.preventDefault(); snapshot(); document.execCommand('insertParagraph'); return; }
     const group = e.inputType.startsWith('insertText') ? 'text' : e.inputType.startsWith('delete') ? 'del' : e.inputType;
     if (keepStyle) { keepStyle = false; lastSnapAt = Date.now(); } // la instantánea ya se tomó al dar formato
@@ -620,7 +671,8 @@ const Editor = (() => {
     lastGroup = group;
   }
 
-  function insertClean(data) {
+  // move: rango arrastrado desde el mismo documento, que se borra antes de insertar (en un solo paso de deshacer).
+  function insertClean(data, move) {
     const html = data.getData('text/html');
     const text = data.getData('text/plain');
     if (!html && !text) return; // imagen o archivo: nada que pegar
@@ -628,6 +680,21 @@ const Editor = (() => {
     if (!clean) return;
     snapshot();
     lastGroup = '';
+    if (move) {
+      const sel = getSelection();
+      const at = mark('mk-drop');
+      sel.getRangeAt(0).insertNode(at);
+      hostOf(move.startContainer).focus({ preventScroll: true });
+      sel.removeAllRanges();
+      sel.addRange(move);
+      document.execCommand('delete');
+      const r = document.createRange();
+      r.setStartBefore(at);
+      hostOf(at).focus({ preventScroll: true });
+      at.remove();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
     document.execCommand('insertHTML', false, clean);
   }
 
@@ -658,18 +725,27 @@ const Editor = (() => {
     e.clipboardData.setData('text/plain', [...box.children].map((p) => p.textContent).join('\n'));
   }
 
-  // Soltar texto arrastrado pasa por la misma limpieza que pegar.
-  // shortcut: arrastrar dentro del documento copia en vez de mover; usar cortar y pegar para mover.
+  // Soltar texto arrastrado pasa por la misma limpieza que pegar. Arrastrar dentro del documento mueve el texto
+  // (salvo una selección de varias páginas, que solo se copia).
+  let dragged = null;
+  function onDragStart() {
+    const s = getSelection();
+    dragged = s.rangeCount && !spansPages() && inDoc(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
+  }
+
   function onDrop(e) {
     const ed = e.target.closest?.('.ed');
+    const move = dragged;
+    dragged = null;
     if (!ed) return;
     e.preventDefault();
     const r = caretFromPoint(e.clientX, e.clientY);
     if (!r || !ed.contains(r.startContainer)) return;
+    if (move?.isPointInRange(r.startContainer, r.startOffset)) return; // soltado sobre sí mismo
     ed.focus({ preventScroll: true });
     getSelection().removeAllRanges();
     getSelection().addRange(r);
-    insertClean(e.dataTransfer);
+    insertClean(e.dataTransfer, move);
   }
 
   // ---------- comandos de formato ----------
@@ -820,6 +896,8 @@ const Editor = (() => {
       root.addEventListener('keydown', onKeyDown);
       root.addEventListener('beforeinput', onBeforeInput);
       root.addEventListener('paste', onPaste);
+      root.addEventListener('dragstart', onDragStart);
+      root.addEventListener('dragend', () => { dragged = null; });
       root.addEventListener('drop', onDrop);
       document.addEventListener('copy', onCopy); // con la selección en varias páginas el evento no siempre nace dentro
       document.addEventListener('selectionchange', syncButtons);
