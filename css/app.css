@@ -61,22 +61,24 @@ td.actions { white-space: nowrap; text-align: right; }
 /* ---------- editor ---------- */
 .editor-view main { max-width: none; padding: 0; }
 .toolbar { position: sticky; top: 0; z-index: 15; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.toolbar .group { display: flex; gap: 4px; align-items: center; padding-right: 8px; margin-right: 2px; border-right: 1px solid var(--line); }
+.toolbar .group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-right: 8px; margin-right: 2px; border-right: 1px solid var(--line); }
 .toolbar .group:last-child { border-right: 0; }
 .toolbar input[type=text] { width: 220px; }
 .toolbar input[type=number] { width: 64px; }
 .toolbar label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
 .status { font-size: 12px; color: var(--muted); min-width: 90px; }
-.editor-wrap { display: flex; gap: 0; align-items: flex-start; }
-.side { position: sticky; top: 60px; width: 280px; flex: none; padding: 16px; max-height: calc(100vh - 60px); overflow: auto; }
+.ico { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* Datos del trabajo (diálogo): dos columnas si hay espacio. */
+#dlg-datos { width: min(760px, calc(100vw - 32px)); }
+.side { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 28px; }
 .side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
-.side h3:first-child { margin-top: 0; }
+.side label { display: block; font-weight: 400; font-size: inherit; }
 .side .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .side .row input[type=number] { width: 72px; }
 .side select { width: 150px; }
 .side textarea { width: 100%; min-height: 70px; resize: vertical; }
 .log { font-size: 12px; color: var(--muted); padding-left: 16px; margin: 0; }
-.pages { --font: "Times New Roman", Times, serif; --size: 12pt; --indent: 0pt; --ls: 0pt; flex: 1; display: flex; flex-direction: column; align-items: safe center; padding: 20px 20px 80px; overflow-x: auto; }
+.pages { --font: "Times New Roman", Times, serif; --size: 12pt; --indent: 0pt; --ls: 0pt; display: flex; flex-direction: column; align-items: safe center; padding: 20px 20px 80px; overflow-x: auto; }
 
 .sheet-bar { width: 612pt; max-width: 100%; display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .sheet-bar span { flex: 1; }
@@ -85,10 +87,12 @@ td.actions { white-space: nowrap; text-align: right; }
 .page .bg img { object-fit: fill; user-select: none; pointer-events: none; }
 .page.virtual .bg::before { content: "BORRADOR · sin papel sellado"; position: absolute; top: 40pt; left: 0; right: 0; text-align: center; color: #c7d3e3; font: 700 18pt var(--font-ui); letter-spacing: .1em; }
 .rule { position: absolute; height: 0; border-top: .75pt solid #9fd8ee; }
-.rule span { position: absolute; left: -22pt; top: -14pt; width: 18pt; text-align: right; color: #5cc3e8; font: 700 11pt "Times New Roman", serif; }
+.rule span { position: absolute; top: -14pt; width: 18pt; text-align: right; color: #5cc3e8; font: 700 11pt "Times New Roman", serif; }
 /* El área de texto recorta lo que no cabe en sus renglones; no crea contexto de bloque para que el sello la envuelva. */
 .area { position: absolute; clip-path: inset(-2pt -6pt -2pt -6pt); }
 .seal { float: left; }
+/* Espacio reservado al sello y al código de barras del frente: se ve en pantalla, no se imprime. */
+@media screen { .seal { background: repeating-linear-gradient(135deg, rgba(31,95,191,.13) 0 1.5pt, transparent 1.5pt 6pt); box-shadow: inset -1.5px -1.5px rgba(31,95,191,.45); } }
 .ed { min-height: 100%; outline: none; color: #000; font-family: var(--font); font-size: var(--size); line-height: var(--lh); letter-spacing: var(--ls);
   overflow-wrap: anywhere; cursor: text; caret-color: #1f5fbf; }
 .ed * { font-size: inherit !important; line-height: inherit !important; font-family: inherit !important; }
@@ -112,8 +116,6 @@ dialog .buttons { display: flex; flex-direction: row-reverse; justify-content: f
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1d2433; color: #fff; padding: 10px 16px; border-radius: 8px; z-index: 50; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
 
 @media (max-width: 900px) {
-  .editor-wrap { flex-direction: column; }
-  .side { position: static; width: auto; max-height: none; order: 2; }
   .top { flex-wrap: wrap; }
 }
 
@@ -121,8 +123,8 @@ dialog .buttons { display: flex; flex-direction: row-reverse; justify-content: f
 @page { size: 8.5in 14in; margin: 0; }
 @media print {
   html, body { background: #fff; }
-  .top, .toolbar, .side, .sheet-bar, .toast, dialog, #view-papers, #view-works { display: none !important; }
-  main, .editor-wrap, .pages { display: block; padding: 0 !important; margin: 0; overflow: visible; }
+  .top, .toolbar, .sheet-bar, .toast, dialog, #view-papers, #view-works { display: none !important; }
+  main, .pages { display: block; padding: 0 !important; margin: 0; overflow: visible; }
   .page { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
   .page:last-child { break-after: auto; page-break-after: auto; }
   .ed:focus { background: none; }

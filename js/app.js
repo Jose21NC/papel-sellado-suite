@@ -99,7 +99,8 @@
   // ---------- papel sellado ----------
   // Las subidas van en fila: dos subidas a la vez podrían agregar la misma hoja dos veces.
   let uploadQueue = Promise.resolve();
-  const uploadFiles = (list) => { uploadQueue = uploadQueue.then(() => doUpload([...list])); return uploadQueue; };
+  // La lista se copia ya: el FileList del input (y el del arrastre) se vacía en cuanto se limpia el input.
+  const uploadFiles = (list) => { const files = [...list]; uploadQueue = uploadQueue.then(() => doUpload(files)); return uploadQueue; };
 
   async function doUpload(list) {
     const files = list.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
@@ -472,6 +473,8 @@
     else if (cmd === 'redo') Editor.redo();
     else Editor.format(cmd);
   });
+
+  $('#btn-datos').addEventListener('click', () => $('#dlg-datos').showModal());
 
   $('#btn-bg').addEventListener('click', (e) => {
     const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
