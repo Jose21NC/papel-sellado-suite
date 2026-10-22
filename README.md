@@ -3,6 +3,8 @@
 Suite para abogados y notarios de Nicaragua que trabajan con el **papel sellado digital de la DGI** (testimonio y protocolo).
 Sube los PDF, escribe directamente sobre los renglones del papel e imprime con o sin el papel de fondo. Cada trabajo queda guardado con su historial.
 
+**Úsela en línea:** https://jose21nc.github.io/papel-sellado-suite/
+
 ## Qué hace
 
 - **Inventario de papel sellado.** Arrastre uno o varios PDF. La suite lee de cada hoja el **tipo** (testimonio / protocolo), el **valor** (C$21, C$14, …), la **serie** y el **número**, y agrupa el inventario por valor. Detecta hojas repetidas. Puede marcar una hoja como **anulada** (inutilizada).
@@ -22,10 +24,10 @@ Todo se guarda **en su navegador** (IndexedDB). Los documentos no se envían a n
 
 ## Cómo usarla
 
-1. Descargue el proyecto (botón **Code → Download ZIP**) y descomprímalo.
-2. Abra `index.html` con **Google Chrome** o **Microsoft Edge** (doble clic). No necesita instalar nada ni tener internet.
-3. En **Papel sellado**, suba sus PDF. En **Mis trabajos**, cree un trabajo y escriba o pegue el texto.
-4. Para imprimir: en el diálogo de impresión deje **Tamaño: Legal (8.5 × 14 pulg.)**, **Márgenes: Ninguno** y **Escala: 100 %**.
+1. Entre a **https://jose21nc.github.io/papel-sellado-suite/** con **Google Chrome** o **Microsoft Edge**.
+   Sin internet: descargue el proyecto (**Code → Download ZIP**), descomprímalo y abra `index.html` con doble clic. Los datos de la versión en línea y los de la descargada se guardan por separado.
+2. En **Papel sellado**, suba sus PDF. En **Mis trabajos**, cree un trabajo y escriba o pegue el texto.
+3. Para imprimir: en el diálogo de impresión deje **Tamaño: Legal (8.5 × 14 pulg.)**, **Márgenes: Ninguno** y **Escala: 100 %**.
 
 > Use siempre el mismo navegador y la misma carpeta: los datos quedan guardados en ese navegador. Abra la suite en una sola pestaña a la vez.
 
