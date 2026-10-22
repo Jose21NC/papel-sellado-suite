@@ -127,8 +127,6 @@ const Editor = (() => {
 
   // ---------- normalización ----------
   const BLOCKS = /^(DIV|H[1-6]|LI|BLOCKQUOTE|PRE|SECTION|ARTICLE|UL|OL|TABLE|TR|TD)$/;
-  const WHITE = '#ffffff';
-  const isWhite = (c) => /^\s*(#fff(fff)?|white|rgba?\(255,\s*255,\s*255(,\s*1)?\))\s*$/i.test(c || '');
 
   function normalize(ed) {
     let wrap = null;
@@ -154,17 +152,11 @@ const Editor = (() => {
       if (el.nodeName === 'P') { const a = el.style.textAlign; el.removeAttribute('style'); if (a) el.style.textAlign = a; continue; }
       // Al quitar un formato, Chrome deja los demás como style (<u style="font-weight: bold">): se pasan a etiquetas.
       const st = el.style;
-      const tags = [/^(bold|bolder|[6-9]00)$/.test(st.fontWeight) && 'b', st.fontStyle === 'italic' && 'i', /underline/.test(st.textDecorationLine) && 'u', isWhite(st.color) && 'font'].filter(Boolean);
+      const tags = [/^(bold|bolder|[6-9]00)$/.test(st.fontWeight) && 'b', st.fontStyle === 'italic' && 'i', /underline/.test(st.textDecorationLine) && 'u'].filter(Boolean);
       el.removeAttribute('style');
-      for (const t of tags) { const w = document.createElement(t); if (t === 'font') w.setAttribute('color', WHITE); w.append(...el.childNodes); el.append(w); }
+      for (const t of tags) { const w = document.createElement(t); w.append(...el.childNodes); el.append(w); }
     }
-    // El texto es negro o blanco (<font color="#ffffff">); cualquier otro color vuelve al negro.
-    for (const el of ed.querySelectorAll('font')) {
-      if (!isWhite(el.getAttribute('color'))) { el.replaceWith(...el.childNodes); continue; }
-      for (const a of [...el.attributes]) el.removeAttribute(a.name);
-      el.setAttribute('color', WHITE);
-    }
-    for (const el of ed.querySelectorAll('span:not([class])')) el.replaceWith(...el.childNodes);
+    for (const el of ed.querySelectorAll('font, span:not([class])')) el.replaceWith(...el.childNodes);
     // Un campo de plantilla [ASÍ] deja de resaltarse en cuanto se escribe el dato.
     for (const el of ed.querySelectorAll('span.campo')) if (!/^\[[^\]]*\]$/.test(el.textContent)) el.replaceWith(...el.childNodes);
     fixFirmas(ed);
@@ -406,7 +398,47 @@ const Editor = (() => {
     const end = paginate(start, full);
     if (had) restoreSelection(scroll);
     if (full) scheduleDashes(0, eds.length); else scheduleDashes(start, end + 1);
+    markPrinted();
     ctx.changed();
+  }
+
+  // ---------- texto ya impreso ----------
+  // work.printedChars: hasta qué carácter del documento ya está impreso en el papel. Con «Ocultar lo impreso»
+  // ese texto y sus guiones se ven grises y no se imprimen, para seguir escribiendo en la misma hoja.
+  let showAll = false; // imprimir una copia completa
+  const hiding = () => !showAll && work.settings.hidePrinted && work.printedChars > 0;
+
+  function markPrinted() {
+    if (!window.CSS?.highlights) return;
+    CSS.highlights.delete('impreso');
+    if (!hiding()) return;
+    const r = document.createRange();
+    r.setStart(eds[0], 0);
+    let left = work.printedChars;
+    for (const ed of eds) {
+      const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+      for (let t; (t = walker.nextNode());) {
+        if (t.length >= left) { r.setEnd(t, left); CSS.highlights.set('impreso', new Highlight(r)); return; }
+        left -= t.length;
+      }
+    }
+    r.setEnd(eds[eds.length - 1], eds[eds.length - 1].childNodes.length);
+    CSS.highlights.set('impreso', new Highlight(r));
+  }
+
+  // all: mostrar todo (copia); si no, según el ajuste del trabajo.
+  function refreshPrinted(all = false) {
+    showAll = all;
+    markPrinted();
+    drawDashes(true);
+  }
+
+  // Caracteres que quedan impresos en el modo dado (con papel, hasta la última cara con papel asignado).
+  function printedUpTo(mode) {
+    let last = eds.length - 1, n = 0;
+    if (mode === 'fondo') while (last > 0 && !paperFor(last)?.pages[last % 2]) last--;
+    for (let i = 0; i <= last; i++) n += eds[i].textContent.length;
+    return n;
   }
 
   function schedule(from) {
@@ -435,9 +467,9 @@ const Editor = (() => {
     dirty.clear();
     const plans = targets.map((ed) => [ed, work.settings.dashes ? measureDashes(ed) : []]);
     for (const [ed, list] of plans) {
-      ed.closest('.page').querySelector('.dashes').replaceChildren(...list.map(([left, top, width]) => {
+      ed.closest('.page').querySelector('.dashes').replaceChildren(...list.map(([left, top, width, printed]) => {
         const d = document.createElement('div');
-        d.className = 'dash';
+        d.className = printed ? 'dash impreso' : 'dash';
         d.style.cssText = `left:${left}pt;top:${top}pt;width:${width}pt`;
         d.textContent = '-'.repeat(160);
         return d;
@@ -454,8 +486,13 @@ const Editor = (() => {
     const area = ed.parentNode.getBoundingClientRect();
     const lineH = area.height / Number(ed.dataset.lines);
     const seal = ed.previousElementSibling.getBoundingClientRect();
-    const add = (x0, x1, top) => { if (x1 - x0 >= 6 * k) out.push([(x0 - pr.left) / k, (top - pr.top) / k, (x1 - x0) / k]); };
+    // Un guion ya está impreso si su párrafo terminó antes del límite (un renglón vacío justo en el límite es nuevo).
+    let end = hiding() ? eds.slice(0, eds.indexOf(ed)).reduce((n, e) => n + e.textContent.length, 0) : 0, printed = false;
+    const add = (x0, x1, top) => { if (x1 - x0 >= 6 * k) out.push([(x0 - pr.left) / k, (top - pr.top) / k, (x1 - x0) / k, printed]); };
     for (const p of ed.children) {
+      const len = p.textContent.length;
+      end += len;
+      printed = hiding() && (end < work.printedChars || (end === work.printedChars && len > 0));
       if (p.hasAttribute('data-split') || p.classList.contains('firma')) continue; // la línea de firma queda en blanco
       const pRect = p.getBoundingClientRect();
       if (pRect.bottom > area.bottom + 1) break; // lo que no cabe se mueve a la página siguiente
@@ -520,7 +557,6 @@ const Editor = (() => {
         if (fmt.u) h = `<u>${h}</u>`;
         if (fmt.i) h = `<i>${h}</i>`;
         if (fmt.b) h = `<b>${h}</b>`;
-        if (fmt.w) h = `<font color="${WHITE}">${h}</font>`;
         cur.html += h;
         return;
       }
@@ -533,7 +569,6 @@ const Editor = (() => {
         b: st.fontWeight ? /^(bold|bolder|[6-9]00)$/.test(st.fontWeight) : fmt.b || tag === 'B' || tag === 'STRONG',
         i: st.fontStyle ? st.fontStyle === 'italic' : fmt.i || tag === 'I' || tag === 'EM',
         u: fmt.u || tag === 'U' || /underline/.test(st.textDecoration || ''),
-        w: st.color ? isWhite(st.color) : fmt.w || (tag === 'FONT' && isWhite(node.getAttribute('color'))),
       };
       const block = BLOCK_SRC.test(tag);
       const a = block ? (st.textAlign || node.getAttribute('align') || '').toLowerCase() : align;
@@ -769,8 +804,6 @@ const Editor = (() => {
     const s = getSelection();
     const inEd = s.rangeCount > 0 && root.contains(s.anchorNode) && !!hostOf(s.anchorNode);
     for (const cmd of TOGGLES) document.querySelector(`.toolbar [data-cmd="${cmd}"]`)?.setAttribute('aria-pressed', inEd && document.queryCommandState(cmd));
-    const white = inEd && isWhite(document.queryCommandValue('foreColor'));
-    for (const b of document.querySelectorAll('.toolbar [data-cmd="foreColor"]')) b.setAttribute('aria-pressed', inEd && isWhite(b.dataset.value) === white);
   }
 
   function format(cmd, value) {
@@ -779,9 +812,9 @@ const Editor = (() => {
     if (spansPages()) { ctx.status('Para dar formato, seleccione texto dentro de una misma página'); return; }
     // Sin selección, el navegador guarda el estilo para lo que se escriba después; mover el cursor (los
     // marcadores de reflow o de una instantánea) lo borraría, así que no se toca nada más.
-    if (sel.isCollapsed && (TOGGLES.includes(cmd) || cmd === 'foreColor')) {
+    if (sel.isCollapsed && TOGGLES.includes(cmd)) {
       if (!keepStyle) snapshot();
-      document.execCommand(cmd, false, value);
+      document.execCommand(cmd);
       keepStyle = true;
       syncButtons();
       return;
@@ -997,11 +1030,13 @@ const Editor = (() => {
   }
 
   // Dibuja el texto de `el` donde está en pantalla, palabra por palabra (así se respeta el justificado).
-  function drawText(cx, el) {
+  // starts: posición de cada texto en el documento, para saltar lo ya impreso (antes de `limit`).
+  function drawText(cx, el, starts, limit) {
     const range = document.createRange();
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     for (let t; (t = walker.nextNode());) {
-      if (!t.data.trim()) continue;
+      const at = starts.get(t) ?? Infinity;
+      if (!t.data.trim() || at + t.length <= limit) continue;
       const st = getComputedStyle(t.parentElement);
       const font = `${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
       cx.font = font;
@@ -1015,8 +1050,8 @@ const Editor = (() => {
         if (rects.length === 1) cx.fillText(s, rects[0].left, rects[0].top + up);
         else if (s.length > 1) [...s].forEach((ch, j) => put(ch, a + j)); // palabra partida entre dos líneas
       };
-      for (const m of t.data.matchAll(/\S+/g)) put(m[0], m.index);
-      if (t.parentElement.closest('u')) {
+      for (const m of t.data.matchAll(/\S+/g)) if (at + m.index >= limit) put(m[0], m.index);
+      if (t.parentElement.closest('u') && at >= limit) {
         const size = parseFloat(st.fontSize);
         range.selectNodeContents(t);
         for (const r of range.getClientRects()) cx.fillRect(r.left, r.top + up + size * 0.1, r.width, size * 0.06);
@@ -1028,6 +1063,10 @@ const Editor = (() => {
   async function pdfPages(mode, offset, onProgress) {
     getSelection().removeAllRanges();
     drawDashes(true);
+    const starts = new Map();
+    let n = 0;
+    for (const ed of eds) for (const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT); w.nextNode();) { starts.set(w.currentNode, n); n += w.currentNode.length; }
+    const limit = hiding() ? work.printedChars : 0;
     const out = [];
     for (let i = 0; i < eds.length; i++) {
       const paper = paperFor(i);
@@ -1052,13 +1091,13 @@ const Editor = (() => {
       cx.scale(PRINT_SCALE / k, PRINT_SCALE / k);
       cx.translate(-pr.left, -pr.top);
       // Mismos recortes que en pantalla: el área de texto (clip-path) y cada guion (overflow: hidden).
-      for (const [el, box, dx, dy] of [[eds[i], eds[i].parentNode, 6, 2], ...[...page.querySelectorAll('.dash')].map((d) => [d, d, 0, 0])]) {
+      for (const [el, box, dx, dy] of [[eds[i], eds[i].parentNode, 6, 2], ...[...page.querySelectorAll('.dash:not(.impreso)')].map((d) => [d, d, 0, 0])]) {
         const b = box.getBoundingClientRect();
         cx.save();
         cx.beginPath();
         cx.rect(b.left - dx * k, b.top - dy * k, b.width + 2 * dx * k, b.height + 2 * dy * k);
         cx.clip();
-        drawText(cx, el);
+        drawText(cx, el, starts, limit);
         cx.restore();
       }
       out.push({ jpeg: await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92)), width: g.width, height: g.height, px: c.width, py: c.height });
@@ -1068,7 +1107,7 @@ const Editor = (() => {
   }
 
   return {
-    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml, edit,
+    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml, edit, refreshPrinted, printedUpTo,
     pagesHtml: () => eds.map((e) => e.innerHTML),
     pageCount: () => eds.length,
     paperForPage: paperFor,

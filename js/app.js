@@ -17,7 +17,7 @@
     ['Cambria, Georgia, serif', 'Cambria'],
     ['Calibri, Carlito, sans-serif', 'Calibri'],
   ];
-  const DEFAULT_SETTINGS = { font: FONTS[0][0], size: 12, indent: 0, letterSpacing: 0, marginLeft: 0, marginRight: 0, gap: 3, dashes: true };
+  const DEFAULT_SETTINGS = { font: FONTS[0][0], size: 12, indent: 0, letterSpacing: 0, marginLeft: 0, marginRight: 0, gap: 3, dashes: true, hidePrinted: false };
 
   const state = { papers: [], works: [], files: new Map(), app: { id: 'app', printOffsetX: 0, printOffsetY: 0 }, work: null };
 
@@ -249,7 +249,7 @@
         const assigned = w.paperIds.filter(Boolean).length;
         const last = w.printLog[w.printLog.length - 1];
         return `<tr data-id="${esc(w.id)}">
-          <td><a href="#trabajo/${esc(w.id)}"><strong>${esc(w.title)}</strong></a></td>
+          <td><a href="#trabajo/${esc(w.id)}">${LABELS.includes(w.label) ? `<span class="tag ${w.label}" title="Etiqueta ${w.label}"></span>` : ''}<strong>${esc(w.title)}</strong></a></td>
           <td>${esc(w.client || '—')}</td>
           <td><span class="pill ${esc(w.kind)}">${esc(cap(w.kind))}${w.paperValue ? ' C$' + esc(w.paperValue) : ''}</span></td>
           <td>${sheets} <span class="muted">(${assigned} con papel)</span></td>
@@ -258,8 +258,7 @@
           <td class="muted">${esc(fmtDate(w.updatedAt))}</td>
           <td class="actions">
             <button class="btn small" data-act="open">Abrir</button>
-            <button class="btn small" data-act="dup">Duplicar</button>
-            <button class="btn small danger" data-act="delete">Eliminar</button>
+            <button class="btn small more" data-act="menu" popovertarget="work-menu" aria-label="Más acciones" title="Más acciones"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="13" cy="8" r="1.2"/></svg></button>
           </td></tr>`;
       }).join('')}</tbody></table>`;
   }
@@ -284,14 +283,39 @@
     go('trabajo/' + w.id);
   });
 
-  $('#works-table').addEventListener('click', async (e) => {
+  // Menú «⋯» de cada trabajo: un solo popover que se coloca junto al botón que lo abre.
+  const LABELS = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'gris'];
+  const menu = $('#work-menu');
+  let menuWork = null, pendingCopy = null;
+  $('#works-table').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const w = workById(btn.closest('tr').dataset.id);
+    const w = btn && workById(btn.closest('tr').dataset.id);
     if (!w) return;
     if (btn.dataset.act === 'open') go('trabajo/' + w.id);
-    else if (btn.dataset.act === 'dup') {
-      const copy = { ...newWork(w), title: w.title + ' (copia)', client: w.client, kind: w.kind, paperValue: w.paperValue, notes: w.notes, settings: { ...w.settings }, pages: [...w.pages] };
+    else { menuWork = w; menu.anchorButton = btn; }
+  });
+  menu.addEventListener('beforetoggle', (e) => {
+    if (e.newState !== 'open') return;
+    for (const b of menu.querySelectorAll('[data-label]')) b.setAttribute('aria-pressed', b.dataset.label === (menuWork.label || ''));
+    // Alineado a la derecha del botón; hacia arriba si no cabe debajo.
+    const r = menu.anchorButton.getBoundingClientRect();
+    const up = r.bottom > innerHeight - 260;
+    Object.assign(menu.style, { right: innerWidth - r.right + 'px', top: up ? 'auto' : r.bottom + 4 + 'px', bottom: up ? innerHeight - r.top + 4 + 'px' : 'auto' });
+  });
+  menu.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    const w = menuWork;
+    if (!btn || !w) return;
+    menu.hidePopover();
+    if ('label' in btn.dataset) {
+      w.label = btn.dataset.label || undefined;
+      await DB.put('works', w);
+      renderWorks();
+    } else if (btn.dataset.act === 'copy') {
+      pendingCopy = w.id;
+      go('trabajo/' + w.id);
+    } else if (btn.dataset.act === 'dup') {
+      const copy = { ...newWork(w), title: w.title + ' (copia)', client: w.client, kind: w.kind, paperValue: w.paperValue, notes: w.notes, label: w.label, settings: { ...w.settings }, pages: [...w.pages] };
       await DB.put('works', copy);
       state.works.push(copy);
       toast('Trabajo duplicado (sin papel asignado)');
@@ -339,8 +363,25 @@
       sheetAction,
     });
     updateCount();
+    syncHide();
     setStatus('Guardado');
+    if (pendingCopy === id) { pendingCopy = null; document.fonts.ready.then(() => setTimeout(() => print('texto', true), 100)); }
   }
+
+  // «Ocultar lo impreso» solo tiene sentido después de anotar una impresión.
+  function syncHide() {
+    const b = $('#btn-hide-printed');
+    b.disabled = !(state.work.printedChars > 0);
+    b.setAttribute('aria-pressed', !b.disabled && state.work.settings.hidePrinted);
+  }
+  $('#btn-hide-printed').addEventListener('click', () => {
+    const s = state.work.settings;
+    s.hidePrinted = !s.hidePrinted;
+    syncHide();
+    Editor.refreshPrinted();
+    saveMeta(() => {});
+    toast(s.hidePrinted ? 'Lo ya impreso se ve gris y no se imprimirá: solo saldrá el texto nuevo.' : 'Se imprimirá todo el texto.');
+  });
 
   function fillSide() {
     const w = state.work;
@@ -471,7 +512,7 @@
     const cmd = b.dataset.cmd;
     if (cmd === 'undo') Editor.undo();
     else if (cmd === 'redo') Editor.redo();
-    else Editor.format(cmd, b.dataset.value);
+    else Editor.format(cmd);
   });
 
   $('#btn-datos').addEventListener('click', () => $('#dlg-datos').showModal());
@@ -576,12 +617,14 @@
     return withPaper;
   }
 
-  async function print(mode) {
+  // copy: copia completa (todo el texto, sin corrimiento de impresora) que no se anota en el historial.
+  async function print(mode, copy = false) {
     if (printing) return;
     const w = state.work;
     const printed = await facesFor(mode);
     if (!printed) return;
-    printing = { w, mode, pages: printed };
+    printing = { w, mode, pages: printed, copy, chars: Editor.printedUpTo(mode) };
+    if (copy) Editor.refreshPrinted(true);
     for (const b of document.querySelectorAll('#btn-print-fondo, #btn-print-texto')) b.disabled = true;
     await saveWork();
     setStatus('Preparando impresión…');
@@ -594,13 +637,14 @@
       return;
     }
     document.body.dataset.print = mode;
-    document.body.style.setProperty('--print-ox', state.app.printOffsetX + 'mm');
-    document.body.style.setProperty('--print-oy', state.app.printOffsetY + 'mm');
+    document.body.style.setProperty('--print-ox', (copy ? 0 : state.app.printOffsetX) + 'mm');
+    document.body.style.setProperty('--print-oy', (copy ? 0 : state.app.printOffsetY) + 'mm');
     setStatus('Guardado');
     setTimeout(() => window.print(), 50);
   }
 
   function endPrint() {
+    if (printing?.copy) Editor.refreshPrinted();
     printing = null;
     delete document.body.dataset.print;
     for (const b of document.querySelectorAll('#btn-print-fondo, #btn-print-texto')) b.disabled = false;
@@ -611,13 +655,18 @@
   window.addEventListener('afterprint', async () => {
     const job = printing;
     endPrint();
-    if (!job) return;
-    if (!(await confirmDialog('¿Se imprimió?', 'Confirme si el documento se imprimió, para anotarlo en el historial del trabajo.', 'Sí, se imprimió'))) return;
+    if (!job || job.copy) return;
+    if (await confirmDialog('¿Se imprimió?', 'Confirme si el documento se imprimió, para anotarlo en el historial del trabajo.', 'Sí, se imprimió')) await recordPrint(job);
+  });
+
+  // Anota una impresión: historial, estado y hasta dónde quedó impreso el texto (para «Ocultar lo impreso»).
+  async function recordPrint(job) {
     job.w.printLog.push({ at: now(), mode: job.mode, pages: job.pages });
     if (job.w.status === 'borrador') job.w.status = 'impreso';
+    job.w.printedChars = job.chars;
     await DB.put('works', job.w);
-    if (state.work === job.w) { $('#ed-state').value = job.w.status; renderLog(); }
-  });
+    if (state.work === job.w) { $('#ed-state').value = job.w.status; renderLog(); syncHide(); Editor.refreshPrinted(); }
+  }
   $('#btn-print-fondo').addEventListener('click', () => print('fondo'));
   // Ctrl+P en el editor usa la impresión de la suite (con papel si hay papel asignado).
   document.addEventListener('keydown', (e) => {
@@ -640,6 +689,7 @@
     try {
       await saveWork();
       const mm = 72 / 25.4;
+      const chars = Editor.printedUpTo(mode);
       const pages = await Editor.pdfPages(mode, { x: state.app.printOffsetX * mm, y: state.app.printOffsetY * mm }, (n, total) => setStatus(`Preparando PDF ${n}/${total}…`));
       const a = document.createElement('a');
       a.href = URL.createObjectURL(await PDF.write(pages));
@@ -647,6 +697,9 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 60000);
       toast(`PDF descargado: ${pages.length} página${pages.length === 1 ? '' : 's'} tamaño legal.`);
+      if (await confirmDialog('¿Va a imprimir este PDF en el papel sellado?', 'Si lo imprime, anótelo: queda en el historial y, con «Ocultar lo impreso», la próxima vez solo saldrá el texto nuevo.', 'Anotar como impreso')) {
+        await recordPrint({ w: state.work, mode, pages: pages.length, chars });
+      }
     } catch (err) {
       console.error(err);
       toast('No se pudo preparar el PDF');
@@ -679,18 +732,16 @@
   });
 
   // El respaldo viene de un archivo: se valida y el HTML de los trabajos se limpia antes de guardarlo.
-  // SPAN solo como mitad de firma (f2) o campo de plantilla (campo); P puede ser línea de firma (class="firma");
-  // FONT solo para el texto blanco.
-  const ALLOWED = new Set(['P', 'B', 'I', 'U', 'BR', 'SPAN', 'FONT']);
+  // SPAN solo como mitad de firma (f2) o campo de plantilla (campo); P puede ser línea de firma (class="firma").
+  const ALLOWED = new Set(['P', 'B', 'I', 'U', 'BR', 'SPAN']);
   function cleanStored(html) {
     const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
     const rootEl = doc.body.firstChild;
     for (const el of [...rootEl.querySelectorAll('*')].reverse()) {
       if (/^(SCRIPT|STYLE|TEMPLATE|IFRAME|OBJECT)$/.test(el.nodeName)) { el.remove(); continue; }
-      if (!ALLOWED.has(el.nodeName) || (el.nodeName === 'SPAN' && !/^(f2|campo)$/.test(el.getAttribute('class') || '')) ||
-        (el.nodeName === 'FONT' && el.getAttribute('color') !== '#ffffff')) { el.replaceWith(...el.childNodes); continue; }
+      if (!ALLOWED.has(el.nodeName) || (el.nodeName === 'SPAN' && !/^(f2|campo)$/.test(el.getAttribute('class') || ''))) { el.replaceWith(...el.childNodes); continue; }
       for (const a of [...el.attributes]) {
-        const keep = el.nodeName === 'SPAN' ? a.name === 'class' : el.nodeName === 'FONT' ? a.name === 'color'
+        const keep = el.nodeName === 'SPAN' ? a.name === 'class'
           : el.nodeName === 'P' && (a.name === 'data-cont' || a.name === 'data-split' || (a.name === 'class' && a.value === 'firma') || (a.name === 'style' && /^text-align:\s*(left|center|right|justify);?$/.test(a.value.trim())));
         if (!keep) el.removeAttribute(a.name);
       }
@@ -733,6 +784,7 @@
         pages: (Array.isArray(w.pages) ? w.pages : []).map((h) => cleanStored(str(h))),
         paperIds: (Array.isArray(w.paperIds) ? w.paperIds : []).map((id) => str(id) || null),
         printLog: (Array.isArray(w.printLog) ? w.printLog : []).map((l) => ({ at: str(l.at), mode: l.mode === 'fondo' ? 'fondo' : 'texto', pages: num(l.pages) ?? 0 })),
+        printedChars: Math.max(0, num(w.printedChars) ?? 0), label: LABELS.includes(w.label) ? w.label : undefined,
       }));
       for (const w of works) w.settings.font = FONTS.some(([v]) => v === w.settings.font) ? w.settings.font : DEFAULT_SETTINGS.font;
       // Lo local manda: una hoja que ya existe conserva su estado y trabajo actuales; no se duplica una serie-número.

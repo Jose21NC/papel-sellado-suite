@@ -441,17 +441,17 @@ const PLANTILLAS = (() => {
     ] },
 
     // ---------- Protocolo ----------
-    { id: 'apertura-protocolo', cat: 'Protocolo', title: 'Acta de apertura de protocolo', tags: 'razón de apertura protocolo año', note: 'Ley del Notariado, Art. 18. Agregue su firma con «Firmas» (opción «Agregar mi firma de notario»).', body: [
+    { id: 'apertura-protocolo', cat: 'Protocolo', title: 'Acta de apertura de protocolo', tags: 'razón de apertura protocolo año', note: 'Ley del Notariado, Art. 18. Agregue su firma con «Firmas» (opción «Usar mis datos en la primera firma»).', body: [
       '^<b>ACTA DE APERTURA DE PROTOCOLO</b>',
       `En la ciudad de {CIUDAD}, {HORA_FECHA}, yo, ${NOT}, abro este mi Protocolo número {PROTOCOLO}, en el cual autorizaré las escrituras públicas que ante mí fueren otorgadas durante el año {PROTOCOLO_ANIO}. Para los fines del artículo dieciocho de la Ley del Notariado, sello y firmo esta razón de apertura.`,
     ] },
-    { id: 'cierre-protocolo', cat: 'Protocolo', title: 'Acta de cierre de protocolo', tags: 'razón de cierre clausura protocolo escrituras suspendidas', note: 'Ley del Notariado, Art. 18. Agregue su firma con «Firmas» (opción «Agregar mi firma de notario»).', body: [
+    { id: 'cierre-protocolo', cat: 'Protocolo', title: 'Acta de cierre de protocolo', tags: 'razón de cierre clausura protocolo escrituras suspendidas', note: 'Ley del Notariado, Art. 18. Agregue su firma con «Firmas» (opción «Usar mis datos en la primera firma»).', body: [
       '^<b>ACTA DE CIERRE DE PROTOCOLO</b>',
       `En la ciudad de {CIUDAD}, {HORA_FECHA}, yo, ${NOT}, cierro este mi Protocolo número {PROTOCOLO}, que llevé durante el año {PROTOCOLO_ANIO}, en el cual se encuentran [NÚMERO EN LETRAS] escrituras públicas. [LAS ESCRITURAS NÚMEROS ... FUERON SUSPENDIDAS.] Para los fines del artículo dieciocho de la Ley del Notariado, extiendo, firmo y sello esta razón de cierre.`,
     ] },
 
     // ---------- Testimonio ----------
-    { id: 'cierre-testimonio', cat: 'Testimonio', title: 'Cierre de testimonio', tags: 'pasó ante mí libro', note: 'Ley del Notariado, Art. 38. Antes de «Pasó ante mí» se copian las firmas de la matriz: «(f) Ilegible» por cada otorgante y la del notario. Agregue su firma con «Firmas» (opción «Agregar mi firma de notario»).', body: [
+    { id: 'cierre-testimonio', cat: 'Testimonio', title: 'Cierre de testimonio', tags: 'pasó ante mí libro', note: 'Ley del Notariado, Art. 38. Antes de «Pasó ante mí» se copian las firmas de la matriz: «(f) Ilegible» por cada otorgante y la del notario. Agregue su firma con «Firmas» (opción «Usar mis datos en la primera firma»).', body: [
       '(f) [ILEGIBLE: UNA POR CADA OTORGANTE] (f) Ilegible {TITULO}.- <b>PASÓ ANTE MÍ:</b> del [FRENTE] del folio número [NÚMERO EN LETRAS] al [REVERSO] del folio número [NÚMERO EN LETRAS] de mi Protocolo número {PROTOCOLO} que llevo durante el año {PROTOCOLO_ANIO}, y a solicitud de [NOMBRE DEL SOLICITANTE], libro este <b>[PRIMER]</b> testimonio en [NÚMERO EN LETRAS] hojas útiles de papel sellado de ley, las que firmo, rubrico y sello en la ciudad de {CIUDAD}, {HORA_FECHA}. [TESTADO: «...» NO VALE. ENTRELÍNEAS: «...» VALE.]',
     ] },
 

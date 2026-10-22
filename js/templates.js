@@ -54,7 +54,7 @@
     if (!v) return '';
     if (kind === 'fecha') return W.isoDateToWords(v);
     if (kind === 'hora') { const m = /^(\d{1,2}):(\d{2})/.exec(v); return m ? W.timeToWords(new Date(2000, 0, 1, +m[1], +m[2])) : ''; }
-    if (kind === 'codigo') return W.spellCode(v);
+    if (kind === 'codigo') return `${W.spellCode(v)} (${v})`;
     const words = W.amountToWords(v);
     if (kind === 'letras') return words ?? W.spellCode(v);
     if (kind === 'numero') return `${words ?? W.spellCode(v)} (${v})`;
@@ -115,7 +115,7 @@
   const dc = $('#dlg-campo');
   const input = $('#campo-input');
   const HINTS = {
-    codigo: 'Escríbalo como aparece en el documento (p. ej. 001-010190-0001A): se pone en letras, carácter por carácter.',
+    codigo: 'Escríbalo como aparece en el documento (p. ej. 001-010190-0001A): se pone en letras, carácter por carácter, y entre paréntesis tal cual.',
     letras: 'Escriba la cifra (p. ej. 1,500 o 250.75): se pone en letras.',
     numero: 'Escriba la cifra: se pone en letras y, entre paréntesis, en cifras.',
     porcentaje: 'Escriba el porcentaje en cifras: se pone en letras y en cifras.',

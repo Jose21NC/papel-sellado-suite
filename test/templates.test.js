@@ -46,7 +46,7 @@ test('todas las plantillas se arman sin claves sueltas y solo con etiquetas perm
 test('campos: cómo se escribe cada dato', () => {
   const { fieldKind: k, fieldText: t } = require('../js/templates.js');
   const put = (label, v) => t(k(label), v);
-  assert.strictEqual(put('NÚMERO DE CÉDULA', '001-01A'), 'cero, cero, uno, guion, cero, uno, letra A');
+  assert.strictEqual(put('NÚMERO DE CÉDULA', '001-01A'), 'cero, cero, uno, guion, cero, uno, letra A (001-01A)');
   assert.strictEqual(put('NÚMERO DE CARNÉ', '12345'), 'doce mil trescientos cuarenta y cinco (12345)');
   assert.strictEqual(put('PRECIO EN LETRAS', '1,500'), 'mil quinientos');
   assert.strictEqual(put('TOMO', '45'), 'cuarenta y cinco (45)');

@@ -7,7 +7,7 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 - Interfaz, comentarios y mensajes de commit en español. Comentarios cortos, solo para el porqué.
 - El cambio más pequeño que resuelva todo. No agregar opciones ni código "para después".
 - **La geometría de impresión es sagrada.** Las páginas miden 612×1008 pt (legal) y el texto debe caer sobre los 30 renglones de la DGI. No tocar sin necesidad: `.page`, `.area`, `.seal`, `.ed` (y sus `p`), `.dash`, `.rule`, `p.firma`, `.f2`, `@page` ni el bloque `@media print` de `css/app.css`.
-- HTML de un trabajo: `p` (alineación, `firma`), `b`, `i`, `u`, `br`, `span.f2`, `span.campo` y `font color="#ffffff"` (texto blanco). Todo HTML que se guarde en un trabajo debe estar permitido en `normalize()` (editor), en `sanitize()` si debe sobrevivir al pegar, y en `cleanStored()` (importar respaldo, `js/app.js`).
+- HTML de un trabajo: `p` (alineación, `firma`), `b`, `i`, `u`, `br`, `span.f2`, `span.campo`. Todo HTML que se guarde en un trabajo debe estar permitido en `normalize()` (editor), en `sanitize()` si debe sobrevivir al pegar, y en `cleanStored()` (importar respaldo, `js/app.js`).
 - Los datos viven solo en el navegador (IndexedDB). Nunca subir al repo PDFs reales de papel sellado: traen datos personales (`*.pdf` y `local/` están en `.gitignore`).
 
 ## Mapa del código
@@ -18,8 +18,8 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB: `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) |
 | `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp); `write()` arma el PDF descargable (una imagen JPEG por página) |
-| `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF» |
-| `js/app.js` | Rutas por hash, inventario, trabajos, autoguardado, asignación de papel, impresión, respaldo, bloqueo de una sola pestaña |
+| `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF»; «Ocultar lo impreso» marca los primeros `work.printedChars` caracteres con `CSS.highlights` (`::highlight(impreso)`) y sus guiones con `.dash.impreso` |
+| `js/app.js` | Rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), respaldo, bloqueo de una sola pestaña |
 | `js/words.js` | Números, fechas y horas en letras (pruebas en `test/words.test.js`) |
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
 | `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md`. Un clic en un campo `[ASÍ]` abre `#dlg-campo`: `fieldKind`/`fieldText` (con pruebas) deciden cómo se escribe el dato |

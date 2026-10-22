@@ -24,26 +24,37 @@
     const n = clamp($('#firmas-rows').value, 1, 6);
     while (list.children.length < n) list.append(row(list.children.length));
     while (list.children.length > n) list.lastElementChild.remove();
+    mine();
+  }
+
+  // «Mi firma» ocupa la primera firma de la primera fila (no agrega otra fila ni otro renglón para firmar).
+  function mine() {
+    const p = Profile.get();
+    const f = list.firstElementChild;
+    const nombre = f.querySelector('[name=nombre0]'), cargo = f.querySelector('[name=cargo0]');
+    const own = [p.nombre, p.titulo || 'Notario Público'];
+    if ($('#firmas-notario').checked) [nombre.value, cargo.value] = own;
+    else if (nombre.value === own[0] && cargo.value === own[1]) nombre.value = cargo.value = '';
   }
 
   const line = (parts) => `<p class="firma">${parts.length === 2 ? parts.map((h) => `<span class="f2">${h}</span>`).join('') : parts[0]}</p>`;
 
   function build() {
     const blank = '<p class="firma"><br></p>'.repeat(clamp($('#firmas-blank').value, 1, 3));
-    const rows = [...list.children].map((f) => {
+    const rows = [...list.children].map((f, i) => {
       const two = f.querySelector('input[type=radio]:checked').value === '2';
-      return (two ? [0, 1] : [0]).map((k) => ({ nombre: f.querySelector(`[name=nombre${k}]`).value.trim(), cargo: f.querySelector(`[name=cargo${k}]`).value.trim() }));
+      return (two ? [0, 1] : [0]).map((k) => ({
+        nombre: f.querySelector(`[name=nombre${k}]`).value.trim(), cargo: f.querySelector(`[name=cargo${k}]`).value.trim(),
+        notario: i === 0 && k === 0 && $('#firmas-notario').checked,
+      }));
     });
-    if ($('#firmas-notario').checked) {
-      const p = Profile.get();
-      rows.push([{ nombre: p.nombre, cargo: p.titulo || 'Notario Público', notario: true }]);
-    }
     return rows.map((sigs) => blank +
       line(sigs.map((s) => (s.nombre ? esc(up(s.nombre)) : `<span class="campo">[NOMBRE${s.notario ? ' DEL NOTARIO' : ''}]</span>`))) +
       (sigs.some((s) => s.cargo) ? line(sigs.map((s) => esc(up(s.cargo)))) : '')).join('');
   }
 
   $('#firmas-rows').addEventListener('input', renderRows);
+  $('#firmas-notario').addEventListener('change', mine);
   $('#btn-firmas').addEventListener('click', () => {
     renderRows();
     d.returnValue = '';

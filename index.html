@@ -84,6 +84,7 @@
           </div>
           <div class="spacer"></div>
           <div class="group">
+            <button class="btn small" id="btn-hide-printed" aria-pressed="false" disabled title="Para seguir escribiendo en una hoja ya impresa: lo que ya se imprimió se ve gris y no se vuelve a imprimir (use «Imprimir solo texto»). Se activa después de anotar una impresión.">Ocultar lo impreso</button>
             <button class="btn small" id="btn-pdf" aria-haspopup="dialog" title="Descarga un PDF tamaño legal para imprimirlo desde otro programa (p. ej. Vista Previa)">Descargar PDF</button>
             <button class="btn small" id="btn-print-texto" title="Imprime solo el texto, para papel sellado ya impreso">Imprimir solo texto</button>
             <button class="btn small primary" id="btn-print-fondo" title="Imprime el papel sellado completo con el texto encima">Imprimir con papel</button>
@@ -102,10 +103,6 @@
             <button class="btn small" data-cmd="justifyCenter" aria-label="Centrar" title="Centrar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M4 6.5h8M2 10h12M4 13.5h8"/></svg></button>
             <button class="btn small" data-cmd="justifyRight" aria-label="Alinear a la derecha" title="Alinear a la derecha"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.5h8M2 10h12M6 13.5h8"/></svg></button>
             <button class="btn small" data-cmd="justifyFull" aria-label="Justificar" title="Justificar"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h12"/></svg></button>
-          </div>
-          <div class="group seg" role="group" aria-label="Color del texto">
-            <button class="btn small" data-cmd="foreColor" data-value="#000000" aria-pressed="false" title="Texto negro">Negro</button>
-            <button class="btn small" data-cmd="foreColor" data-value="#ffffff" aria-pressed="false" title="Texto blanco: se imprime sin tinta (en pantalla se ve con un borde gris)">Blanco</button>
           </div>
           <div class="group">
             <select id="ed-font" aria-label="Tipo de letra"></select>
@@ -206,6 +203,24 @@
     </form>
   </dialog>
 
+  <div id="work-menu" class="menu" popover>
+    <button type="button" data-act="dup">Duplicar</button>
+    <button type="button" data-act="copy">Imprimir copia</button>
+    <div class="menu-tags" role="group" aria-label="Etiqueta">
+      <span>Etiqueta</span>
+      <button type="button" class="tag" data-label="" aria-label="Sin etiqueta" title="Sin etiqueta"></button>
+      <button type="button" class="tag rojo" data-label="rojo" aria-label="Roja" title="Roja"></button>
+      <button type="button" class="tag naranja" data-label="naranja" aria-label="Naranja" title="Naranja"></button>
+      <button type="button" class="tag amarillo" data-label="amarillo" aria-label="Amarilla" title="Amarilla"></button>
+      <button type="button" class="tag verde" data-label="verde" aria-label="Verde" title="Verde"></button>
+      <button type="button" class="tag azul" data-label="azul" aria-label="Azul" title="Azul"></button>
+      <button type="button" class="tag morado" data-label="morado" aria-label="Morada" title="Morada"></button>
+      <button type="button" class="tag gris" data-label="gris" aria-label="Gris" title="Gris"></button>
+    </div>
+    <hr>
+    <button type="button" data-act="delete" class="danger">Eliminar</button>
+  </div>
+
   <dialog id="dlg-campo" aria-labelledby="campo-title">
     <form method="dialog">
       <h2 id="campo-title"></h2>
@@ -299,7 +314,7 @@
         <label>Filas de firmas <input type="number" id="firmas-rows" min="1" max="6" step="1" value="1"></label>
         <label>Renglones para firmar <input type="number" id="firmas-blank" min="1" max="3" step="1" value="2"></label>
       </div>
-      <label class="check"><input type="checkbox" id="firmas-notario"> Agregar mi firma de notario (de «Mis datos»)</label>
+      <label class="check"><input type="checkbox" id="firmas-notario"> Usar mis datos en la primera firma (de «Mis datos»)</label>
       <div class="firma-rows" id="firmas-list"></div>
       <div class="buttons"><button class="btn primary" value="ok">Insertar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
     </form>
