@@ -158,6 +158,8 @@ const Editor = (() => {
       for (const t of tags) { const w = document.createElement(t); w.append(...el.childNodes); el.append(w); }
     }
     for (const el of ed.querySelectorAll('font, span:not([class])')) el.replaceWith(...el.childNodes);
+    // Un campo de plantilla [ASÍ] deja de resaltarse en cuanto se escribe el dato.
+    for (const el of ed.querySelectorAll('span.campo')) if (!/^\[[^\]]*\]$/.test(el.textContent)) el.replaceWith(...el.childNodes);
     const ps = ed.children;
     for (let k = 0; k < ps.length; k++) {
       const p = ps[k];
@@ -230,9 +232,14 @@ const Editor = (() => {
       if (r.bottom <= box.bottom + 1) continue;
       const range = document.createRange();
       let inside = false;
-      if (r.top >= limit) {
-        if (k === 0) return null; // ni el primer renglón cabe: no se puede partir
-        range.setStartBefore(p);
+      const firma = p.classList.contains('firma');
+      if (r.top >= limit || firma) {
+        // Un bloque de firmas no se parte: pasa entero a la página siguiente (salvo que no quepa ni en una página vacía).
+        let k0 = k;
+        if (firma) while (k0 > 0 && ps[k0 - 1].classList.contains('firma')) k0--;
+        if (k0 === 0) k0 = k;
+        if (k0 === 0) return null; // ni el primer renglón cabe: no se puede partir
+        range.setStartBefore(ps[k0]);
       } else {
         const start = findLineStart(p, limit);
         if (!start) continue;
@@ -392,7 +399,7 @@ const Editor = (() => {
     const seal = ed.previousElementSibling.getBoundingClientRect();
     const add = (x0, x1, top) => { if (x1 - x0 >= 6 * k) out.push([(x0 - pr.left) / k, (top - pr.top) / k, (x1 - x0) / k]); };
     for (const p of ed.children) {
-      if (p.hasAttribute('data-split')) continue;
+      if (p.hasAttribute('data-split') || p.classList.contains('firma')) continue; // la línea de firma queda en blanco
       const pRect = p.getBoundingClientRect();
       if (pRect.bottom > area.bottom + 1) break; // lo que no cabe se mueve a la página siguiente
       const lineTop = pRect.bottom - lineH;
@@ -727,6 +734,75 @@ const Editor = (() => {
     syncButtons();
   }
 
+  // ---------- insertar bloques (plantillas, firmas) ----------
+  let lastRange = null; // último cursor en el documento: abrir un diálogo le quita la selección
+  const inDoc = (n) => !!n && root.contains(n) && !!hostOf(n);
+  function trackCaret() {
+    const s = getSelection();
+    if (s.rangeCount && inDoc(s.anchorNode)) lastRange = s.getRangeAt(0).cloneRange();
+  }
+
+  // html: párrafos ya armados y confiables (no pasan por sanitize). Se insertan en el cursor partiendo el
+  // párrafo; si el documento está vacío, lo reemplazan. Sin cursor, van al final.
+  function insertHtml(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const nodes = [...tpl.content.childNodes];
+    if (!nodes.length) return;
+    snapshot();
+    lastGroup = '';
+    const sel = getSelection();
+    let r = sel.rangeCount && inDoc(sel.anchorNode) ? sel.getRangeAt(0) : lastRange;
+    if (r && !inDoc(r.startContainer)) r = null;
+    if (r && hostOf(r.startContainer) !== hostOf(r.endContainer)) r.collapse(true); // selección en varias páginas
+    let ed;
+    if (eds.every((e) => !e.textContent.trim())) {
+      eds.forEach((e) => e.replaceChildren());
+      ed = eds[0];
+      ed.append(tpl.content);
+    } else {
+      if (!r) { r = document.createRange(); r.selectNodeContents([...eds].reverse().find((e) => e.textContent.trim())); r.collapse(false); }
+      ed = hostOf(r.startContainer);
+      r.deleteContents();
+      const p = (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentNode).closest('p');
+      if (p && ed.contains(p)) {
+        const tail = document.createRange();
+        tail.setStart(r.startContainer, r.startOffset);
+        tail.setEnd(p, p.childNodes.length);
+        const after = p.cloneNode(false); // misma alineación; el corte entre páginas sigue con la segunda mitad
+        after.removeAttribute('data-cont');
+        p.removeAttribute('data-split');
+        after.append(tail.extractContents());
+        p.after(after);
+        after.before(tpl.content);
+        if (!after.textContent) after.remove();
+        if (!p.textContent) p.remove();
+      } else r.insertNode(tpl.content);
+    }
+    const last = nodes[nodes.length - 1];
+    const c = document.createRange();
+    c.selectNodeContents(last);
+    c.collapse(false);
+    ed.focus({ preventScroll: true });
+    sel.removeAllRanges();
+    sel.addRange(c);
+    reflow(Math.max(0, eds.indexOf(ed) - 1));
+  }
+
+  // Enter al final de un bloque de firmas: la línea nueva es texto normal (el navegador copia la clase).
+  function plainAfterFirma(e) {
+    const s = getSelection();
+    if (e.inputType !== 'insertParagraph' || !s.rangeCount) return;
+    const p = (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode).closest?.('p.firma');
+    if (!p || p.textContent || p.nextElementSibling?.classList.contains('firma')) return;
+    p.removeAttribute('class');
+    p.replaceChildren(document.createElement('br'));
+    const r = document.createRange();
+    r.setStart(p, 0);
+    s.removeAllRanges();
+    s.addRange(r);
+  }
+
   // ---------- API ----------
   function mount(el, w, c) {
     root = el; work = w; ctx = c;
@@ -748,6 +824,8 @@ const Editor = (() => {
       root.addEventListener('drop', onDrop);
       document.addEventListener('copy', onCopy); // con la selección en varias páginas el evento no siempre nace dentro
       document.addEventListener('selectionchange', syncButtons);
+      root.addEventListener('input', plainAfterFirma);
+      document.addEventListener('selectionchange', trackCaret);
       root.addEventListener('input', (e) => { const ed = e.target.closest?.('.ed'); if (ed) schedule(eds.indexOf(ed) - 1); });
       root.addEventListener('compositionstart', () => { composing = true; });
       root.addEventListener('compositionend', (e) => { composing = false; const ed = e.target.closest?.('.ed'); if (ed) schedule(eds.indexOf(ed) - 1); });
@@ -796,7 +874,7 @@ const Editor = (() => {
   }
 
   return {
-    mount, relayout, applySettings, format, undo, redo, preparePrint, sanitize,
+    mount, relayout, applySettings, format, undo, redo, preparePrint, sanitize, insertHtml,
     pagesHtml: () => eds.map((e) => e.innerHTML),
     pageCount: () => eds.length,
     paperForPage: paperFor,

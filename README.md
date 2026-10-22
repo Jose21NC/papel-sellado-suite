@@ -15,8 +15,11 @@ Sube los PDF, escribe directamente sobre los renglones del papel e imprime con o
   - *Imprimir con papel:* imprime el papel sellado completo (a 300 ppp) con el texto encima, en papel legal en blanco.
   - *Imprimir solo texto:* imprime únicamente el texto, para papel sellado ya impreso. Si la impresora corre el texto, ajuste el desplazamiento (mm) una sola vez.
 - **Trabajos e historial.** Cada trabajo guarda el título, el cliente o las partes, el tipo y el valor del papel, las notas, el estado (borrador / impreso / finalizado), las hojas asignadas, la fecha de creación, la última edición y cada impresión. Puede buscar por título, cliente o **texto**, y duplicar trabajos.
+- **Mis datos.** Guarde una vez su nombre, título, cédula, carné de la CSJ, domicilio, vencimiento del quinquenio, protocolo y ciudad: se usan para llenar las plantillas. La primera vez, una breve introducción le ofrece guardarlos (puede verla de nuevo desde **Mis datos**).
+- **Plantillas.** Más de cuarenta modelos de escrituras, actas, cláusulas y cierre de testimonio, por categoría y con buscador. Se insertan con sus datos, el número de escritura y la hora y la fecha en letras; lo demás queda como campos resaltados en amarillo (`[NOMBRE DEL VENDEDOR]`) que se reemplazan con un clic. Son **modelos de referencia**: revíselos y adáptelos.
+- **Firmas.** Inserta renglones en blanco para firmar (sin guiones), el nombre y la calidad, hasta dos firmas por renglón, y su propia firma de notario. El bloque no se parte entre páginas.
 - **Borrador sin papel.** Puede redactar antes de tener el papel: la suite le dice cuántas hojas necesita. Luego use **Asignar papel disponible**.
-- **Respaldo.** *Exportar respaldo* descarga un archivo `.json` con todos sus trabajos y PDF. *Importar respaldo* lo restaura en otra computadora.
+- **Respaldo.** *Exportar respaldo* descarga un archivo `.json` con todos sus trabajos, PDF y «Mis datos». *Importar respaldo* lo restaura en otra computadora.
 
 ## Privacidad
 
@@ -55,5 +58,7 @@ node --test test/*.test.js
 - `js/editor.js`: editor por cara, flujo del texto entre páginas, deshacer, pegado e impresión.
 - `js/app.js`: inventario, trabajos, asignación de papel, respaldo.
 - `js/db.js`: almacenamiento en IndexedDB.
+- `js/words.js`: números, fechas y horas en letras (con pruebas).
+- `js/profile.js`: Mis datos e introducción. `js/templates-data.js` y `js/templates.js`: plantillas (con pruebas). `js/firmas.js`: bloques de firmas.
 
 Valores del papel sellado vigentes desde el 1 de enero de 2026: **protocolo C$14** y **testimonio C$21** por hoja. Los valores anteriores (C$12 y C$19) también se reconocen. Si una hoja no se reconoce, puede corregir el tipo y el valor con **Editar**.
