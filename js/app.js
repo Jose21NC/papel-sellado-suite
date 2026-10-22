@@ -628,7 +628,7 @@
     const out = {
       app: 'papel-sellado-suite', version: 1, exportedAt: now(),
       files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(f.blob) }))),
-      papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app,
+      papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app, profile: Profile.filled() ? Profile.get() : undefined,
     };
     const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -640,15 +640,17 @@
   });
 
   // El respaldo viene de un archivo: se valida y el HTML de los trabajos se limpia antes de guardarlo.
-  const ALLOWED = new Set(['P', 'B', 'I', 'U', 'BR']);
+  // SPAN solo como mitad de firma (f2) o campo de plantilla (campo); P puede ser línea de firma (class="firma").
+  const ALLOWED = new Set(['P', 'B', 'I', 'U', 'BR', 'SPAN']);
   function cleanStored(html) {
     const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
     const rootEl = doc.body.firstChild;
     for (const el of [...rootEl.querySelectorAll('*')].reverse()) {
       if (/^(SCRIPT|STYLE|TEMPLATE|IFRAME|OBJECT)$/.test(el.nodeName)) { el.remove(); continue; }
-      if (!ALLOWED.has(el.nodeName)) { el.replaceWith(...el.childNodes); continue; }
+      if (!ALLOWED.has(el.nodeName) || (el.nodeName === 'SPAN' && !/^(f2|campo)$/.test(el.getAttribute('class') || ''))) { el.replaceWith(...el.childNodes); continue; }
       for (const a of [...el.attributes]) {
-        const keep = el.nodeName === 'P' && (a.name === 'data-cont' || a.name === 'data-split' || (a.name === 'style' && /^text-align:\s*(left|center|right|justify);?$/.test(a.value.trim())));
+        const keep = el.nodeName === 'SPAN' ? a.name === 'class'
+          : el.nodeName === 'P' && (a.name === 'data-cont' || a.name === 'data-split' || (a.name === 'class' && a.value === 'firma') || (a.name === 'style' && /^text-align:\s*(left|center|right|justify);?$/.test(a.value.trim())));
         if (!keep) el.removeAttribute(a.name);
       }
     }
@@ -666,7 +668,7 @@
     let data;
     try { data = JSON.parse(await file.text()); } catch { toast('El archivo no es un respaldo válido'); return; }
     if (data?.app !== 'papel-sellado-suite' || !Array.isArray(data.works) || !Array.isArray(data.papers) || !Array.isArray(data.files)) { toast('El archivo no es un respaldo de Papel Sellado Suite'); return; }
-    if (!(await confirmDialog('Importar respaldo', `Se importarán ${data.works.length} trabajos y ${data.papers.length} hojas. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
+    if (!(await confirmDialog('Importar respaldo', `Se importarán ${data.works.length} trabajos y ${data.papers.length} hojas${data.profile ? ', y sus datos de «Mis datos»' : ''}. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
     try {
       const files = [];
       for (const f of data.files) {
@@ -703,6 +705,7 @@
       await DB.putMany('files', files);
       await DB.putMany('papers', newPapers);
       await DB.putMany('works', works);
+      if (data.profile && typeof data.profile === 'object') await Profile.save(data.profile);
       files.forEach((f) => { state.files.delete(f.id); PDF.forget(f.id); });
       await loadAll();
       // Cada trabajo solo conserva las hojas que de verdad le pertenecen.
@@ -740,6 +743,7 @@
     try {
       navigator.storage?.persist?.(); // pide al navegador no borrar los datos por falta de espacio
       await loadAll();
+      await Profile.init();
     } catch (err) {
       console.error(err);
       document.querySelector('main').innerHTML = '<div class="empty">Este navegador no permite guardar datos locales (IndexedDB). Use Chrome, Edge o Firefox y no el modo privado.</div>';

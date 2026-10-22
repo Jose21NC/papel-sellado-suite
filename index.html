@@ -15,6 +15,7 @@
       <button class="tab" data-route="papel">Papel sellado</button>
     </nav>
     <div class="spacer"></div>
+    <button class="btn small" id="btn-profile" title="Sus datos de abogado o notario, para llenar las plantillas">Mis datos</button>
     <button class="btn small" id="btn-export" title="Descarga un archivo con todos sus trabajos y papeles">Exportar respaldo</button>
     <button class="btn small" id="btn-import" title="Restaura un respaldo exportado antes">Importar respaldo</button>
   </header>
@@ -93,6 +94,10 @@
         <div class="group">
           <select id="ed-font" aria-label="Tipo de letra"></select>
           <label>Tamaño <input type="number" id="ed-size" min="8" max="16" step="0.5" aria-label="Tamaño de letra (pt)"></label>
+        </div>
+        <div class="group" aria-label="Plantillas y firmas">
+          <button class="btn small" id="btn-templates" title="Insertar un modelo de escritura, acta o cláusula">Plantillas</button>
+          <button class="btn small" id="btn-firmas" title="Insertar firmas: renglón en blanco para firmar, nombre y calidad">Firmas</button>
         </div>
         <div class="group">
           <button class="btn small" data-cmd="undo" title="Deshacer (Ctrl+Z)">↶</button>
@@ -185,6 +190,81 @@
   <input type="file" id="file-backup" accept="application/json,.json" hidden>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <dialog id="dlg-profile" aria-labelledby="profile-title">
+    <form method="dialog">
+      <h2 id="profile-title">Mis datos</h2>
+      <p class="hint">Se usan para llenar las plantillas automáticamente. Se guardan solo en este navegador y en sus respaldos.</p>
+      <div class="fields" id="profile-fields"></div>
+      <button type="button" class="linklike" id="btn-welcome-again">Ver la introducción</button>
+      <div class="buttons"><button class="btn primary" value="ok">Guardar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-welcome" aria-labelledby="welcome-title">
+    <form method="dialog">
+      <section data-step="1">
+        <h2 id="welcome-title" tabindex="-1">Le damos la bienvenida a Papel Sellado Suite</h2>
+        <p>Escriba escrituras y testimonios directamente sobre el papel sellado digital de la DGI e imprímalos alineados con sus 30 renglones.</p>
+        <p class="hint">Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
+      </section>
+      <section data-step="2" hidden>
+        <h2 tabindex="-1">Cómo funciona</h2>
+        <div class="how">
+          <div><b data-n="1">Suba el papel</b>En «Papel sellado», arrastre los PDF de la DGI. Se leen el tipo, el valor, la serie y el número de cada hoja.</div>
+          <div><b data-n="2">Escriba sobre el papel</b>Cree un trabajo y escriba o pegue el texto: pasa solo de una cara a la otra. Use «Plantillas» y «Firmas».</div>
+          <div><b data-n="3">Imprima</b>Con el papel de fondo, en hoja legal en blanco, o solo el texto, sobre papel sellado ya impreso.</div>
+        </div>
+      </section>
+      <section data-step="3" hidden>
+        <h2 tabindex="-1">Sus datos (opcional)</h2>
+        <p class="hint">Con ellos las plantillas se llenan solas: nombre, domicilio, quinquenio, ciudad… Se guardan solo en este navegador. Puede completarlos o cambiarlos cuando quiera en «Mis datos».</p>
+        <div class="fields" id="welcome-fields"></div>
+      </section>
+      <section data-step="4" hidden>
+        <h2 tabindex="-1">Listo</h2>
+        <p>Cree su primer trabajo con «+ Nuevo trabajo». Puede volver a ver esta introducción desde «Mis datos».</p>
+      </section>
+      <div class="buttons">
+        <button class="btn primary" type="button" id="welcome-next">Siguiente</button>
+        <button class="btn" type="button" id="welcome-back">Atrás</button>
+        <span class="spacer"></span>
+        <div class="steps-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <button class="btn" value="skip" formnovalidate id="welcome-skip">Omitir</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-templates" class="wide" aria-labelledby="tpl-title">
+    <form method="dialog">
+      <h2 id="tpl-title">Plantillas</h2>
+      <p class="hint">Modelos de referencia según la Ley del Notariado, el Código Civil y el Código de Familia: revíselos y adáptelos al caso. Los campos en amarillo se completan a mano.</p>
+      <div class="tpl-bar">
+        <input type="search" id="tpl-q" placeholder="Buscar: poder, hipoteca, vehículo…" aria-label="Buscar plantilla">
+        <select id="tpl-cat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
+        <label>Nº de escritura <input type="number" id="tpl-num" min="1" max="9999" step="1"></label>
+      </div>
+      <div class="tpl-body">
+        <div class="tpl-list" id="tpl-list" role="radiogroup" aria-label="Plantillas"></div>
+        <div class="tpl-preview" id="tpl-preview" aria-live="polite" tabindex="0"></div>
+      </div>
+      <div class="buttons"><button class="btn primary" value="ok">Insertar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-firmas" aria-labelledby="firmas-title">
+    <form method="dialog">
+      <h2 id="firmas-title">Insertar firmas</h2>
+      <p class="hint">Cada firma lleva renglones en blanco para firmar (sin guiones), el nombre y, si quiere, la calidad o el cargo. El bloque no se parte entre páginas.</p>
+      <div class="tpl-bar">
+        <label>Filas de firmas <input type="number" id="firmas-rows" min="1" max="6" step="1" value="1"></label>
+        <label>Renglones para firmar <input type="number" id="firmas-blank" min="1" max="3" step="1" value="2"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="firmas-notario"> Agregar mi firma de notario (de «Mis datos»)</label>
+      <div class="firma-rows" id="firmas-list"></div>
+      <div class="buttons"><button class="btn primary" value="ok">Insertar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
   <script src="vendor/pdfjs/pdf.min.js"></script>
   <!-- Cargar el worker como script hace que pdf.js trabaje en el hilo principal: así funciona también abriendo el archivo sin servidor. -->
   <script src="vendor/pdfjs/pdf.worker.min.js"></script>
@@ -192,6 +272,11 @@
   <script src="js/db.js"></script>
   <script src="js/pdf.js"></script>
   <script src="js/editor.js"></script>
+  <script src="js/words.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/templates-data.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/firmas.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
