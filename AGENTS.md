@@ -42,6 +42,6 @@ No hay paso de compilación: publicar es `git push` a `main` (Hostinger lo despl
 
 ## Estado y pendientes conocidos
 - Sin probar en Safari ni Firefox.
-- Firebase: probado contra un Firebase simulado; contra el proyecto real lexia-suite (plan Spark, sin Storage) entran y salen las cuentas, falta publicar `firebase/firestore.rules` para guardar datos. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
+- Firebase: probado contra un Firebase simulado y contra el proyecto real lexia-suite (plan Spark, sin Storage), con una cuenta de prueba que se borra al terminar. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
 - En el celular la barra del editor se desplaza de lado (a propósito: no cabe en una fila).
 - Plantillas: son modelos; la base legal de la frase del quinquenio y los requisitos actuales de Migración para menores no se verificaron.

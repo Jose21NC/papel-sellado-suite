@@ -4,14 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lexia</title>
-  <link rel="icon" href="data:,"> <!-- sin favicon: evita un 404 -->
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="logo" viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7 27 19v57h29l7 12H12Z" stroke="var(--navy)" stroke-width="5" stroke-linejoin="miter"/><g stroke="var(--sky)" stroke-width="4.5"><path d="M67 14v56q0 18-18 18"/><path d="M45 24q22-9 44 0M46 25 38 45M46 25l8 20M88 25l-8 20M88 25l8 20"/></g><g fill="var(--sky)"><path d="M67 3l4 6-4 6-4-6Z"/><path d="M35 45h22a11 9 0 0 1-22 0ZM77 45h22a11 9 0 0 1-22 0Z"/><rect x="66" y="84" width="22" height="5" rx="2.5"/></g></symbol></svg>
   <!-- Entrar o crear cuenta (solo si Firebase está configurado) -->
   <section id="auth" class="auth" hidden>
+    <div class="auth-brand">
+      <svg class="auth-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <div class="auth-name">LEXIA</div>
+      <p>Escrituras, protocolo y papel sellado de Nicaragua, en un solo lugar.</p>
+    </div>
     <form class="auth-card" id="auth-form" novalidate>
-      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span>
       <h1 id="auth-title">Entrar</h1>
       <p class="muted" id="auth-sub">Con su cuenta, sus trabajos, su protocolo y su papel sellado quedan guardados y los puede abrir en cualquier computadora.</p>
       <label>Correo <input type="email" name="email" autocomplete="email" required></label>
@@ -25,7 +30,7 @@
   </section>
 
   <header class="top">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span> Lexia</div>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg><use href="#logo"/></svg></span> Lexia</div>
     <nav class="tabs" aria-label="Secciones">
       <button class="tab" data-route="trabajos">Mis trabajos</button>
       <button class="tab" data-route="papel">Papel sellado</button>
@@ -310,7 +315,7 @@
   <dialog id="dlg-welcome" aria-labelledby="welcome-title">
     <form method="dialog">
       <section data-step="1">
-        <span class="brand-mark big" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span>
+        <span class="brand-mark big" aria-hidden="true"><svg><use href="#logo"/></svg></span>
         <h2 id="welcome-title" tabindex="-1">Le damos la bienvenida a Lexia</h2>
         <p>Escriba escrituras y testimonios directamente sobre el papel sellado digital de la DGI e imprímalos alineados con sus 30 renglones.</p>
         <p class="hint">Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
