@@ -645,6 +645,7 @@
     const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
     const rootEl = doc.body.firstChild;
     for (const el of [...rootEl.querySelectorAll('*')].reverse()) {
+      if (/^(SCRIPT|STYLE|TEMPLATE|IFRAME|OBJECT)$/.test(el.nodeName)) { el.remove(); continue; }
       if (!ALLOWED.has(el.nodeName)) { el.replaceWith(...el.childNodes); continue; }
       for (const a of [...el.attributes]) {
         const keep = el.nodeName === 'P' && (a.name === 'data-cont' || a.name === 'data-split' || (a.name === 'style' && /^text-align:\s*(left|center|right|justify);?$/.test(a.value.trim())));

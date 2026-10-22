@@ -164,7 +164,8 @@ const Editor = (() => {
     if (lastP.lastChild?.nodeName === 'BR') lastP.lastChild.remove();
     while (firstP.firstChild) lastP.append(firstP.firstChild);
     firstP.remove();
-    lastP.removeAttribute('data-split');
+    // Si la parte unida también seguía en otra página (párrafo de 3+ páginas), el párrafo sigue partido.
+    if (!firstP.hasAttribute('data-split')) lastP.removeAttribute('data-split');
     return true;
   }
 
@@ -233,8 +234,7 @@ const Editor = (() => {
       const frag = range.extractContents();
       if (inside) {
         p.setAttribute('data-split', '');
-        frag.firstChild.setAttribute('data-cont', '');
-        frag.firstChild.removeAttribute('data-split');
+        frag.firstChild.setAttribute('data-cont', ''); // conserva data-split si el párrafo sigue más allá
       }
       return frag;
     }
@@ -415,7 +415,7 @@ const Editor = (() => {
   }
 
   function applyHtml(html) {
-    setPageCount(html.length);
+    setPageCount(Math.max(html.length, work.paperIds.length * 2));
     html.forEach((h, i) => { eds[i].innerHTML = h; });
     restoreSelection(true);
     reflow(0, true, true);
@@ -453,8 +453,9 @@ const Editor = (() => {
       if (tag === 'BR') { if (!cur) open(align); close(); return; }
       const st = node.style || {};
       const f = {
-        b: fmt.b || tag === 'B' || tag === 'STRONG' || /^(bold|[6-9]00)$/.test(st.fontWeight || ''),
-        i: fmt.i || tag === 'I' || tag === 'EM' || st.fontStyle === 'italic',
+        // Un estilo explícito manda (Google Docs envuelve todo en <b style="font-weight:normal">).
+        b: st.fontWeight ? /^(bold|bolder|[6-9]00)$/.test(st.fontWeight) : fmt.b || tag === 'B' || tag === 'STRONG',
+        i: st.fontStyle ? st.fontStyle === 'italic' : fmt.i || tag === 'I' || tag === 'EM',
         u: fmt.u || tag === 'U' || /underline/.test(st.textDecoration || ''),
       };
       const block = BLOCK_SRC.test(tag);
@@ -478,6 +479,7 @@ const Editor = (() => {
     const r = document.createRange();
     r.selectNodeContents(ed);
     r.collapse(where === 'start');
+    if (where === 'start' && ed.firstElementChild) { r.selectNodeContents(ed.firstElementChild); r.collapse(true); }
     if (where === 'end') {
       const last = ed.lastElementChild;
       if (last) { r.selectNodeContents(last); r.collapse(false); if (last.lastChild?.nodeName === 'BR') r.setStartBefore(last.lastChild); }
@@ -527,6 +529,22 @@ const Editor = (() => {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && !e.altKey && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
     if (mod && !e.altKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+    if (e.key === 'Tab' && !mod) { e.preventDefault(); return; } // la sangría es un ajuste; Tab no salta de página
+    // Ctrl+A selecciona el documento completo (para copiar); editar sigue siendo por página.
+    if (mod && !e.altKey && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      const r = document.createRange();
+      r.setStart(eds[0], 0);
+      r.setEnd(eds[eds.length - 1], eds[eds.length - 1].childNodes.length);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      return;
+    }
+    if (spansPages() && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter') && !mod) {
+      e.preventDefault();
+      ctx.status('La selección abarca varias páginas: solo se puede copiar. Haga clic en el texto para seguir escribiendo.');
+      return;
+    }
     if (mod && ['b', 'i', 'u'].includes(e.key.toLowerCase())) { e.preventDefault(); format({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); return; }
     if (e.key === 'Backspace' && i > 0 && atEdge(ed, 'start')) {
       e.preventDefault();
@@ -569,6 +587,7 @@ const Editor = (() => {
 
   function onBeforeInput(e) {
     if (!e.target.closest?.('.ed')) return;
+    if (spansPages()) { e.preventDefault(); return; }
     if (e.inputType === 'historyUndo') { e.preventDefault(); undo(); return; }
     if (e.inputType === 'historyRedo') { e.preventDefault(); redo(); return; }
     if (e.inputType === 'insertLineBreak') { e.preventDefault(); snapshot(); document.execCommand('insertParagraph'); return; }
@@ -579,7 +598,9 @@ const Editor = (() => {
 
   function insertClean(data) {
     const html = data.getData('text/html');
-    const clean = html ? sanitize(html) : textToHtml(data.getData('text/plain'));
+    const text = data.getData('text/plain');
+    if (!html && !text) return; // imagen o archivo: nada que pegar
+    const clean = html ? sanitize(html) : textToHtml(text);
     if (!clean) return;
     snapshot();
     lastGroup = '';
@@ -589,7 +610,28 @@ const Editor = (() => {
   function onPaste(e) {
     if (!e.target.closest?.('.ed')) return;
     e.preventDefault();
-    insertClean(e.clipboardData);
+    if (!spansPages()) insertClean(e.clipboardData);
+  }
+
+  // Copiar una selección de varias páginas: solo el texto (sin barras ni números de renglón) y con los
+  // párrafos partidos entre páginas vueltos a unir.
+  function onCopy(e) {
+    if (!spansPages()) return;
+    e.preventDefault();
+    const r = getSelection().getRangeAt(0);
+    const box = document.createElement('div');
+    for (const ed of eds) {
+      if (!r.intersectsNode(ed)) continue;
+      const sub = document.createRange();
+      sub.selectNodeContents(ed);
+      if (ed.contains(r.startContainer)) sub.setStart(r.startContainer, r.startOffset);
+      if (ed.contains(r.endContainer)) sub.setEnd(r.endContainer, r.endOffset);
+      box.append(sub.cloneContents());
+    }
+    for (const p of [...box.children]) if (p.parentNode === box) while (joinSplit(p, p.nextElementSibling));
+    for (const p of box.children) { p.removeAttribute('data-split'); p.removeAttribute('data-cont'); }
+    e.clipboardData.setData('text/html', box.innerHTML);
+    e.clipboardData.setData('text/plain', [...box.children].map((p) => p.textContent).join('\n'));
   }
 
   // Soltar texto arrastrado pasa por la misma limpieza que pegar.
@@ -607,9 +649,13 @@ const Editor = (() => {
   }
 
   // ---------- comandos de formato ----------
+  const hostOf = (n) => (n.nodeType === 1 ? n : n.parentNode)?.closest?.('.ed');
+  const spansPages = () => { const s = getSelection(); return s.rangeCount > 0 && !s.isCollapsed && hostOf(s.anchorNode) !== hostOf(s.focusNode); };
+
   function format(cmd, value) {
     const sel = getSelection();
     if (!sel.rangeCount || !root.contains(sel.anchorNode)) { ctx.status('Primero haga clic en el texto'); return; }
+    if (spansPages()) { ctx.status('Para dar formato, seleccione texto dentro de una misma página'); return; }
     snapshot();
     lastGroup = '';
     if (cmd === 'upper' || cmd === 'lower') {
@@ -628,8 +674,19 @@ const Editor = (() => {
       sel.removeAllRanges(); sel.addRange(r);
     } else {
       document.execCommand(cmd, false, value);
+      // Un párrafo partido entre páginas son dos <p>: la alineación se copia a la otra mitad.
+      if (cmd.startsWith('justify')) {
+        const r = sel.getRangeAt(0);
+        const host = hostOf(r.startContainer);
+        for (const p of host ? host.children : []) {
+          if (!r.intersectsNode(p)) continue;
+          const i = eds.indexOf(host);
+          const other = p.hasAttribute('data-cont') ? eds[i - 1]?.lastElementChild : p.hasAttribute('data-split') ? eds[i + 1]?.firstElementChild : null;
+          if (other) other.style.textAlign = p.style.textAlign;
+        }
+      }
     }
-    const ed = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentNode).closest('.ed');
+    const ed = sel.anchorNode && hostOf(sel.anchorNode);
     reflow(Math.max(0, eds.indexOf(ed) - 1));
   }
 
@@ -652,6 +709,7 @@ const Editor = (() => {
       root.addEventListener('beforeinput', onBeforeInput);
       root.addEventListener('paste', onPaste);
       root.addEventListener('drop', onDrop);
+      document.addEventListener('copy', onCopy); // con la selección en varias páginas el evento no siempre nace dentro
       root.addEventListener('input', (e) => { const ed = e.target.closest?.('.ed'); if (ed) schedule(eds.indexOf(ed) - 1); });
       root.addEventListener('compositionstart', () => { composing = true; });
       root.addEventListener('compositionend', (e) => { composing = false; const ed = e.target.closest?.('.ed'); if (ed) schedule(eds.indexOf(ed) - 1); });
