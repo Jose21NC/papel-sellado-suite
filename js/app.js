@@ -476,11 +476,15 @@
 
   $('#btn-datos').addEventListener('click', () => $('#dlg-datos').showModal());
 
-  $('#btn-bg').addEventListener('click', (e) => {
-    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
-    e.currentTarget.setAttribute('aria-pressed', on);
-    document.body.classList.toggle('hide-bg', !on);
-  });
+  // Fondo en pantalla: normal, atenuado u oculto (la impresión no cambia). Se recuerda en este navegador.
+  function setBg(mode) {
+    document.body.classList.remove('bg-dim', 'bg-off');
+    if (mode) document.body.classList.add(mode);
+    for (const b of document.querySelectorAll('#bg-mode [data-bg]')) b.setAttribute('aria-pressed', b.dataset.bg === mode);
+    try { localStorage.setItem('pss-bg', mode); } catch {}
+  }
+  $('#bg-mode').addEventListener('click', (e) => { const b = e.target.closest('[data-bg]'); if (b) setBg(b.dataset.bg); });
+  try { setBg(localStorage.getItem('pss-bg') || ''); } catch { setBg(''); }
 
   // ---------- asignación de papel ----------
   const matches = (w, p) => p.type === w.kind && (w.paperValue == null || p.value === w.paperValue);

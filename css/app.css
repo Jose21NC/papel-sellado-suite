@@ -144,7 +144,7 @@ td.muted { min-width: 140px; font-size: 13px; text-wrap: balance; }
 .toolbar .group { display: flex; align-items: center; gap: 6px; }
 .tools > .group + .group { position: relative; margin-left: 9px; }
 .tools > .group + .group::before { content: ""; position: absolute; left: -9px; top: 7px; bottom: 7px; width: 1px; background: var(--line-strong); }
-.tools > #btn-bg { margin-left: auto; }
+.tools > #bg-mode { margin-left: auto; }
 /* Grupo segmentado: botones sobre una pista gris; el activo se ve en relieve. */
 .toolbar .seg { gap: 2px; padding: 2px; border-radius: 9px; background: var(--fill); }
 .seg .btn { height: 26px; min-width: 30px; padding: 0 9px; background: none; color: var(--ink-2); }
@@ -194,7 +194,7 @@ td.muted { min-width: 140px; font-size: 13px; text-wrap: balance; }
 .ed p[data-cont] { text-indent: 0; }
 .ed p[data-split]:not([style*="left"]):not([style*="center"]):not([style*="right"]) { text-align-last: justify; }
 .ed:focus { background: rgba(31,95,191,.025); }
-@media screen { body.hide-bg .page .bg { visibility: hidden; } }
+@media screen { body.bg-dim .page .bg { opacity: .4; } body.bg-off .page .bg { visibility: hidden; } }
 .dashes { position: absolute; inset: 0; pointer-events: none; }
 .dash { position: absolute; overflow: hidden; white-space: nowrap; color: #000; font-family: var(--font); font-size: var(--size); line-height: var(--lh); height: var(--lh); letter-spacing: 1pt; }
 /* Firmas: cada línea es un renglón, centrada y sin guiones; dos firmas por renglón van en mitades.

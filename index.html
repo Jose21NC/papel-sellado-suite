@@ -114,7 +114,7 @@
             <button class="btn small" data-cmd="undo" aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 2 6l3 3M2 6h7.5a3.5 3.5 0 0 1 0 7H6"/></svg></button>
             <button class="btn small" data-cmd="redo" aria-label="Rehacer" title="Rehacer (Ctrl+Shift+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m11 3 3 3-3 3m3-3H6.5a3.5 3.5 0 0 0 0 7H10"/></svg></button>
           </div>
-          <button class="btn small" id="btn-bg" aria-pressed="true" title="Mostrar u ocultar el papel sellado en pantalla">Ver papel</button>
+          <div class="seg" id="bg-mode" role="group" aria-label="Papel sellado en pantalla"><button class="btn small" data-bg="" aria-pressed="true" title="Papel sellado normal">Papel</button><button class="btn small" data-bg="bg-dim" aria-pressed="false" title="Atenuar el papel sellado (no cambia la impresión)">Atenuado</button><button class="btn small" data-bg="bg-off" aria-pressed="false" title="Ocultar el papel sellado (no cambia la impresión)">Oculto</button></div>
         </div>
       </div>
       <div class="pages" id="pages"></div>

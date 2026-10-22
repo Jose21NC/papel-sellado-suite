@@ -78,8 +78,7 @@ const Editor = (() => {
     const seal = page.querySelector('.seal');
     const sealW = sideFor(i) === 'frente' ? g.sealRight + 4 - left : 0;
     seal.style.width = Math.max(0, sealW) + 'pt';
-    // Los renglones cortos son sealLines, pero el código de barras baja hasta el siguiente: se reserva uno más.
-    seal.style.height = sealW > 0 ? (g.sealLines + 1) * L + 'pt' : '0';
+    seal.style.height = sealW > 0 ? g.sealLines * L + 'pt' : '0';
 
     const paper = paperFor(i);
     const bg = page.querySelector('.bg');
