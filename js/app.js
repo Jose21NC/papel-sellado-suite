@@ -566,17 +566,21 @@
   // ---------- impresión ----------
   let printing = null; // impresión en curso: evita dobles clics y se registra al cerrar el diálogo
 
+  // Caras que salen en el modo dado (con papel, solo las que tienen papel asignado); 0 si no se sigue.
+  async function facesFor(mode) {
+    const pages = Editor.pageCount();
+    if (mode !== 'fondo') return pages;
+    const withPaper = Array.from({ length: pages }, (_, i) => Editor.paperForPage(i)?.pages[i % 2]).filter(Boolean).length;
+    if (!withPaper) { toast('Asigne papel sellado a las hojas para imprimir con el papel de fondo.'); return 0; }
+    if (withPaper < pages && !(await confirmDialog('Hay hojas sin papel', `${pages - withPaper} de ${pages} caras no tienen papel sellado asignado y quedarán fuera. ¿Seguir con las demás?`, 'Seguir'))) return 0;
+    return withPaper;
+  }
+
   async function print(mode) {
     if (printing) return;
     const w = state.work;
-    const pages = Editor.pageCount();
-    let printed = pages;
-    if (mode === 'fondo') {
-      const withPaper = Array.from({ length: pages }, (_, i) => Editor.paperForPage(i)?.pages[i % 2]).filter(Boolean).length;
-      if (!withPaper) { toast('Asigne papel sellado a las hojas para imprimir con el papel de fondo.'); return; }
-      if (withPaper < pages && !(await confirmDialog('Hay hojas sin papel', `${pages - withPaper} de ${pages} caras no tienen papel sellado asignado y no se imprimirán. ¿Imprimir las demás?`, 'Imprimir'))) return;
-      printed = withPaper;
-    }
+    const printed = await facesFor(mode);
+    if (!printed) return;
     printing = { w, mode, pages: printed };
     for (const b of document.querySelectorAll('#btn-print-fondo, #btn-print-texto')) b.disabled = true;
     await saveWork();
@@ -623,6 +627,34 @@
     }
   });
   $('#btn-print-texto').addEventListener('click', () => print('texto'));
+
+  // PDF tamaño legal: algunas impresoras no toman el tamaño de la página desde el navegador; desde un visor de PDF sí.
+  $('#btn-pdf').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const d = $('#dlg-pdf');
+    d.returnValue = '';
+    d.showModal();
+    const mode = await new Promise((r) => d.addEventListener('close', () => r(d.returnValue), { once: true }));
+    if ((mode !== 'fondo' && mode !== 'texto') || !(await facesFor(mode))) return;
+    btn.disabled = true;
+    try {
+      await saveWork();
+      const mm = 72 / 25.4;
+      const pages = await Editor.pdfPages(mode, { x: state.app.printOffsetX * mm, y: state.app.printOffsetY * mm }, (n, total) => setStatus(`Preparando PDF ${n}/${total}…`));
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await PDF.write(pages));
+      a.download = `${state.work.title.replace(/[\\/:*?"<>|]+/g, '-')}${mode === 'texto' ? ' (solo texto)' : ''}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      toast(`PDF descargado: ${pages.length} página${pages.length === 1 ? '' : 's'} tamaño legal.`);
+    } catch (err) {
+      console.error(err);
+      toast('No se pudo preparar el PDF');
+    } finally {
+      btn.disabled = false;
+      setStatus('Guardado');
+    }
+  });
 
   // ---------- respaldo ----------
   const blobToDataUrl = (b) => new Promise((r, j) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => j(fr.error); fr.readAsDataURL(b); });

@@ -1,4 +1,4 @@
-// Lectura y dibujo de los PDF de papel sellado con pdf.js (corre en el hilo principal: funciona también abriendo index.html sin servidor).
+// Lectura y dibujo de los PDF de papel sellado con pdf.js, y armado del PDF descargable (corre en el hilo principal: funciona también abriendo index.html sin servidor).
 const PDF = (() => {
   const docs = new Map(); // fileId -> Promise<PDFDocumentProxy>
   const images = new Map(); // `${fileId}:${page}:${scale}` -> Promise<objectURL>
@@ -51,5 +51,28 @@ const PDF = (() => {
     for (const [key, url] of images) if (key.startsWith(fileId + ':')) { url.then(URL.revokeObjectURL).catch(() => {}); images.delete(key); }
   }
 
-  return { analyze, image, forget };
+  // Arma un PDF con una imagen JPEG por página. pages: [{ jpeg: Blob, width, height (pt), px, py (píxeles) }].
+  async function write(pages) {
+    const parts = [], offsets = [];
+    let pos = 0;
+    const add = (x) => { parts.push(x); pos += typeof x === 'string' ? x.length : x.byteLength; }; // texto solo ASCII
+    const obj = (n, ...body) => { offsets[n] = pos; add(`${n} 0 obj\n`); body.forEach(add); add('\nendobj\n'); };
+    add('%PDF-1.4\n');
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    obj(2, `<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, k) => `${3 + 3 * k} 0 R`).join(' ')}] >>`);
+    for (const [k, p] of pages.entries()) {
+      const n = 3 + 3 * k;
+      const draw = `q ${p.width} 0 0 ${p.height} 0 0 cm /Im Do Q`;
+      const jpeg = new Uint8Array(await p.jpeg.arrayBuffer());
+      obj(n, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${p.width} ${p.height}] /Contents ${n + 1} 0 R /Resources << /XObject << /Im ${n + 2} 0 R >> >> >>`);
+      obj(n + 1, `<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`);
+      obj(n + 2, `<< /Type /XObject /Subtype /Image /Width ${p.px} /Height ${p.py} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.byteLength} >>\nstream\n`, jpeg, '\nendstream');
+    }
+    const xref = pos;
+    add(`xref\n0 ${offsets.length}\n0000000000 65535 f \n` + offsets.slice(1).map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join(''));
+    add(`trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+
+  return { analyze, image, write, forget };
 })();

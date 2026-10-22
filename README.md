@@ -14,6 +14,7 @@ Sube los PDF, escribe directamente sobre los renglones del papel e imprime con o
 - **Impresión.**
   - *Imprimir con papel:* imprime el papel sellado completo (a 300 ppp) con el texto encima, en papel legal en blanco.
   - *Imprimir solo texto:* imprime únicamente el texto, para papel sellado ya impreso. Si la impresora corre el texto, ajuste el desplazamiento (mm) una sola vez.
+  - *Descargar PDF:* descarga un PDF tamaño legal (con papel o solo texto) para imprimirlo desde otro programa, por ejemplo Vista Previa en Mac. Úselo si la impresora no toma el tamaño legal desde el navegador.
 - **Trabajos e historial.** Cada trabajo guarda el título, el cliente o las partes, el tipo y el valor del papel, las notas, el estado (borrador / impreso / finalizado), las hojas asignadas, la fecha de creación, la última edición y cada impresión. Puede buscar por título, cliente o **texto**, y duplicar trabajos.
 - **Mis datos.** Guarde una vez su nombre, título, cédula, carné de la CSJ, domicilio, vencimiento del quinquenio, protocolo y ciudad: se usan para llenar las plantillas. La primera vez, una breve introducción le ofrece guardarlos (puede verla de nuevo desde **Mis datos**).
 - **Plantillas.** 59 modelos de escrituras, actas, protocolo, cláusulas y cierre de testimonio, revisados con el *Manual del Notario nicaragüense*, por categoría y con buscador (lista completa y fuentes en [PLANTILLAS.md](PLANTILLAS.md)). Se insertan con sus datos, el número de escritura y la hora y la fecha en letras; lo demás queda como campos resaltados en amarillo (`[NOMBRE DEL VENDEDOR]`) que se reemplazan con un clic. Son **modelos de referencia**: revíselos y adáptelos.
@@ -30,7 +31,7 @@ Todo se guarda **en su navegador** (IndexedDB). Los documentos no se envían a n
 1. Entre a **https://jose21nc.github.io/papel-sellado-suite/** con **Google Chrome** o **Microsoft Edge**.
    Sin internet: descargue el proyecto (**Code → Download ZIP**), descomprímalo y abra `index.html` con doble clic. Los datos de la versión en línea y los de la descargada se guardan por separado.
 2. En **Papel sellado**, suba sus PDF. En **Mis trabajos**, cree un trabajo y escriba o pegue el texto.
-3. Para imprimir: en el diálogo de impresión deje **Tamaño: Legal (8.5 × 14 pulg.)**, **Márgenes: Ninguno** y **Escala: 100 %**.
+3. Para imprimir: en el diálogo de impresión deje **Tamaño: Legal (8.5 × 14 pulg.)**, **Márgenes: Ninguno** y **Escala: 100 %**. Si su impresora no ofrece el tamaño legal desde el navegador, use **Descargar PDF** e imprima el PDF a tamaño real.
 
 > Use siempre el mismo navegador y la misma carpeta: los datos quedan guardados en ese navegador. Abra la suite en una sola pestaña a la vez.
 

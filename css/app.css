@@ -184,7 +184,8 @@ td.muted { min-width: 140px; font-size: 13px; text-wrap: balance; }
 .rule span { position: absolute; top: -14pt; width: 18pt; text-align: right; color: #5cc3e8; font: 700 11pt "Times New Roman", serif; }
 /* El área de texto recorta lo que no cabe en sus renglones; no crea contexto de bloque para que el sello la envuelva. */
 .area { position: absolute; clip-path: inset(-2pt -6pt -2pt -6pt); }
-.seal { float: left; }
+/* El texto rodea el escudo 1 pt más corto: el redondeo de píxeles no debe acortar el renglón siguiente. */
+.seal { float: left; shape-outside: inset(0 0 1pt 0); }
 /* Espacio reservado al sello y al código de barras del frente: se ve en pantalla, no se imprime. */
 @media screen { .seal { background: repeating-linear-gradient(135deg, rgba(31,95,191,.13) 0 1.5pt, transparent 1.5pt 6pt); box-shadow: inset -1.5px -1.5px rgba(31,95,191,.45); } }
 .ed { min-height: 100%; outline: none; color: #000; font-family: var(--font); font-size: var(--size); line-height: var(--lh); letter-spacing: var(--ls);

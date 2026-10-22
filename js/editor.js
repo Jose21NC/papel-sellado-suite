@@ -950,8 +950,97 @@ const Editor = (() => {
     drawDashes(true);
   }
 
+  // ---------- PDF descargable ----------
+  // Distancia (px de pantalla) del borde superior del texto a su línea base, como la calcula el navegador.
+  const ascents = new Map();
+  function domAscent(font) {
+    if (!ascents.has(font)) {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:normal';
+      d.style.font = font;
+      d.innerHTML = 'Hg<span style="display:inline-block;width:0;height:0"></span>';
+      document.body.append(d);
+      const r = document.createRange();
+      r.selectNodeContents(d.firstChild);
+      ascents.set(font, d.lastChild.getBoundingClientRect().top - r.getBoundingClientRect().top);
+      d.remove();
+    }
+    return ascents.get(font);
+  }
+
+  // Dibuja el texto de `el` donde está en pantalla, palabra por palabra (así se respeta el justificado).
+  function drawText(cx, el) {
+    const range = document.createRange();
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let t; (t = walker.nextNode());) {
+      if (!t.data.trim()) continue;
+      const st = getComputedStyle(t.parentElement);
+      const font = `${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
+      cx.font = font;
+      cx.letterSpacing = st.letterSpacing === 'normal' ? '0px' : st.letterSpacing;
+      const up = domAscent(font);
+      const put = (s, a) => {
+        range.setStart(t, a);
+        range.setEnd(t, a + s.length);
+        const rects = [...range.getClientRects()].filter((r) => r.width > 0);
+        if (rects.length === 1) cx.fillText(s, rects[0].left, rects[0].top + up);
+        else if (s.length > 1) [...s].forEach((ch, j) => put(ch, a + j)); // palabra partida entre dos líneas
+      };
+      for (const m of t.data.matchAll(/\S+/g)) put(m[0], m.index);
+      if (t.parentElement.closest('u')) {
+        const size = parseFloat(st.fontSize);
+        range.selectNodeContents(t);
+        for (const r of range.getClientRects()) cx.fillRect(r.left, r.top + up + size * 0.1, r.width, size * 0.06);
+      }
+    }
+  }
+
+  // Cada cara a 300 ppp en JPEG, igual que al imprimir. offset (pt): corrimiento de la impresora en «solo texto».
+  async function pdfPages(mode, offset, onProgress) {
+    getSelection().removeAllRanges();
+    drawDashes(true);
+    const out = [];
+    for (let i = 0; i < eds.length; i++) {
+      const paper = paperFor(i);
+      if (mode === 'fondo' && !paper?.pages[i % 2]) continue;
+      onProgress?.(i + 1, eds.length);
+      const g = geometryFor(i);
+      const c = document.createElement('canvas');
+      c.width = Math.round(g.width * PRINT_SCALE);
+      c.height = Math.round(g.height * PRINT_SCALE);
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#fff';
+      cx.fillRect(0, 0, c.width, c.height);
+      if (mode === 'fondo') {
+        const img = new Image();
+        img.src = await ctx.image(paper, i % 2, PRINT_SCALE);
+        await img.decode();
+        cx.drawImage(img, 0, 0, c.width, c.height);
+      } else cx.translate(offset.x * PRINT_SCALE, offset.y * PRINT_SCALE);
+      const page = eds[i].closest('.page');
+      const pr = page.getBoundingClientRect();
+      const k = pr.width / g.width; // px de pantalla por pt
+      cx.scale(PRINT_SCALE / k, PRINT_SCALE / k);
+      cx.translate(-pr.left, -pr.top);
+      cx.fillStyle = '#000';
+      // Mismos recortes que en pantalla: el área de texto (clip-path) y cada guion (overflow: hidden).
+      for (const [el, box, dx, dy] of [[eds[i], eds[i].parentNode, 6, 2], ...[...page.querySelectorAll('.dash')].map((d) => [d, d, 0, 0])]) {
+        const b = box.getBoundingClientRect();
+        cx.save();
+        cx.beginPath();
+        cx.rect(b.left - dx * k, b.top - dy * k, b.width + 2 * dx * k, b.height + 2 * dy * k);
+        cx.clip();
+        drawText(cx, el);
+        cx.restore();
+      }
+      out.push({ jpeg: await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92)), width: g.width, height: g.height, px: c.width, py: c.height });
+      c.width = c.height = 0; // libera la memoria del lienzo
+    }
+    return out;
+  }
+
   return {
-    mount, relayout, applySettings, format, undo, redo, preparePrint, sanitize, insertHtml,
+    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml,
     pagesHtml: () => eds.map((e) => e.innerHTML),
     pageCount: () => eds.length,
     paperForPage: paperFor,

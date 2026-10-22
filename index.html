@@ -84,6 +84,7 @@
           </div>
           <div class="spacer"></div>
           <div class="group">
+            <button class="btn small" id="btn-pdf" aria-haspopup="dialog" title="Descarga un PDF tamaño legal para imprimirlo desde otro programa (p. ej. Vista Previa)">Descargar PDF</button>
             <button class="btn small" id="btn-print-texto" title="Imprime solo el texto, para papel sellado ya impreso">Imprimir solo texto</button>
             <button class="btn small primary" id="btn-print-fondo" title="Imprime el papel sellado completo con el texto encima">Imprimir con papel</button>
           </div>
@@ -190,6 +191,14 @@
       <label>Serie <input type="text" name="serie"></label>
       <label>Número <input type="text" name="numero"></label>
       <div class="buttons"><button class="btn primary" value="ok">Guardar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-pdf" aria-labelledby="pdf-title">
+    <form method="dialog">
+      <h2 id="pdf-title">Descargar PDF</h2>
+      <p class="hint" style="margin:0">Un PDF tamaño legal (8.5 × 14 pulg.) a 300 ppp. Ábralo e imprímalo en papel legal a tamaño real (100 %).</p>
+      <div class="buttons"><button class="btn primary" value="fondo">Con papel</button><button class="btn" value="texto">Solo texto</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
     </form>
   </dialog>
 

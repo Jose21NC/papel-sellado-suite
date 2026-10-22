@@ -17,8 +17,8 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 | `css/app.css` | Estilos con variables en `:root` (claro/oscuro), estética minimalista tipo Apple; reglas de papel e impresión |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB: `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) |
-| `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp) |
-| `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml` |
+| `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp); `write()` arma el PDF descargable (una imagen JPEG por página) |
+| `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF» |
 | `js/app.js` | Rutas por hash, inventario, trabajos, autoguardado, asignación de papel, impresión, respaldo, bloqueo de una sola pestaña |
 | `js/words.js` | Números, fechas y horas en letras (pruebas en `test/words.test.js`) |
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
