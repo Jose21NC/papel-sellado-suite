@@ -82,15 +82,23 @@
     document.body.classList.toggle('editor-view', name === 'trabajo');
     $('#view-works').hidden = name !== 'trabajos' && name !== '';
     $('#view-papers').hidden = name !== 'papel';
+    $('#view-perfil').hidden = name !== 'perfil';
     $('#view-editor').hidden = name !== 'trabajo';
     for (const t of document.querySelectorAll('.tab')) t.toggleAttribute('aria-current', false);
     const current = document.querySelector(`.tab[data-route="${name === 'trabajo' ? 'trabajos' : name || 'trabajos'}"]`);
     current?.setAttribute('aria-current', 'page');
     if (name === 'papel') renderPapers();
+    else if (name === 'perfil') renderPerfil();
     else if (name === 'trabajo') openWork(id);
     else renderWorks();
   }
   const go = (r) => { location.hash = r; };
+
+  function renderPerfil() {
+    const p = Profile.get();
+    $('#perfil-resumen').textContent = p.nombre ? `${p.nombre}${p.titulo ? ' · ' + p.titulo : ''}` : 'Todavía no ha guardado sus datos.';
+  }
+  $('#dlg-profile').addEventListener('close', () => setTimeout(renderPerfil)); // Profile ya guardó lo nuevo
   document.addEventListener('click', (e) => {
     const r = e.target.closest('[data-route]');
     if (r) go(r.dataset.route);
@@ -284,7 +292,7 @@
   });
 
   // Menú «⋯» de cada trabajo: un solo popover que se coloca junto al botón que lo abre.
-  const LABELS = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'gris'];
+  const LABELS = ['rojo', 'naranja', 'amarillo', 'verde', 'azul'];
   const menu = $('#work-menu');
   let menuWork = null, pendingCopy = null;
   $('#works-table').addEventListener('click', (e) => {
@@ -388,6 +396,9 @@
 
   function fillSide() {
     const w = state.work;
+    // El protocolo no tiene cliente, tipo, estado ni notas: solo sus ajustes de papel, texto e impresión.
+    $('#ed-work-fields').hidden = !!w.protocolo;
+    $('#btn-datos').textContent = $('#datos-title').textContent = w.protocolo ? 'Ajustes' : 'Datos del trabajo';
     $('#ed-title').value = w.title;
     $('#ed-client').value = w.client;
     $('#ed-kind').value = w.kind;

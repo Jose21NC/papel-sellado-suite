@@ -16,9 +16,7 @@
     </nav>
     <div class="spacer"></div>
     <div class="top-actions">
-      <button class="btn small quiet" id="btn-profile" title="Sus datos de abogado o notario, para llenar las plantillas">Mis datos</button>
-      <button class="btn small quiet" id="btn-export" title="Descarga un archivo con todos sus trabajos y papeles">Exportar respaldo</button>
-      <button class="btn small quiet" id="btn-import" title="Restaura un respaldo exportado antes">Importar respaldo</button>
+      <button class="tab tab-perfil" data-route="perfil" title="Mis datos y respaldo"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.75 14c.6-2.7 2.7-4.25 5.25-4.25s4.65 1.55 5.25 4.25"/></svg>Perfil</button>
     </div>
   </header>
 
@@ -71,6 +69,27 @@
       </div>
       <div class="cards" id="papers-cards"></div>
       <div class="table-wrap" id="papers-table"></div>
+    </section>
+
+    <!-- Perfil -->
+    <section id="view-perfil" hidden>
+      <div class="view-head"><h1>Perfil</h1></div>
+      <div class="panels">
+        <div class="panel">
+          <h2>Mis datos</h2>
+          <p class="muted" id="perfil-resumen"></p>
+          <p class="muted">Su nombre, título, cédula, carné, quinquenio y protocolo: se usan para llenar las plantillas y las firmas.</p>
+          <button class="btn" id="btn-profile">Editar mis datos</button>
+        </div>
+        <div class="panel">
+          <h2>Respaldo</h2>
+          <p class="muted">Todo se guarda solo en este navegador. Exporte un respaldo con frecuencia (trabajos, papel sellado y sus datos) e impórtelo para restaurarlo en otra computadora.</p>
+          <div class="panel-actions">
+            <button class="btn" id="btn-export">Exportar respaldo</button>
+            <button class="btn" id="btn-import">Importar respaldo</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Editor -->
@@ -129,6 +148,7 @@
       <h2 id="datos-title">Datos del trabajo</h2>
       <div class="side">
         <div>
+          <div id="ed-work-fields">
           <div class="row"><span>Cliente / partes</span></div>
           <input type="text" id="ed-client" style="width:100%" aria-label="Cliente o partes">
           <div class="row" style="margin-top:8px"><span>Tipo de papel</span>
@@ -137,6 +157,7 @@
           <div class="row"><span>Estado</span>
             <select id="ed-state"><option value="borrador">Borrador</option><option value="impreso">Impreso</option><option value="finalizado">Finalizado</option></select></div>
           <textarea id="ed-notes" placeholder="Notas (número de escritura, fecha, observaciones…)" aria-label="Notas"></textarea>
+          </div>
 
           <h3>Papel</h3>
           <p id="ed-count" class="muted" style="margin:0 0 8px"></p>
@@ -216,8 +237,6 @@
       <button type="button" class="tag amarillo" data-label="amarillo" aria-label="Amarilla" title="Amarilla"></button>
       <button type="button" class="tag verde" data-label="verde" aria-label="Verde" title="Verde"></button>
       <button type="button" class="tag azul" data-label="azul" aria-label="Azul" title="Azul"></button>
-      <button type="button" class="tag morado" data-label="morado" aria-label="Morada" title="Morada"></button>
-      <button type="button" class="tag gris" data-label="gris" aria-label="Gris" title="Gris"></button>
     </div>
     <hr>
     <button type="button" data-act="delete" class="danger">Eliminar</button>

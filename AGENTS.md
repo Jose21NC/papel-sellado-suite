@@ -13,7 +13,7 @@ Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben 
 ## Mapa del código
 | Archivo | Qué hace |
 |---|---|
-| `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-editor`), barra del editor y todos los `<dialog>` |
+| `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-perfil` con Mis datos y respaldo, `#view-editor`), barra del editor y todos los `<dialog>` |
 | `css/app.css` | Estilos con variables en `:root` (claro/oscuro), estética minimalista tipo Apple; reglas de papel e impresión |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB: `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) |
