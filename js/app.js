@@ -69,7 +69,7 @@
     if (!state.files.has(fileId)) {
       const p = DB.get('files', fileId).then(async (f) => {
         if (!f || f.blob || !Cloud.user()) return f?.blob;
-        const blob = await Cloud.fileBlob(fileId);
+        const blob = await Cloud.fileBlob(fileId, f.chunks);
         await DB.put('files', { ...f, blob }, true);
         return blob;
       });

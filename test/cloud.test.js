@@ -17,3 +17,10 @@ test('trabajos de ida y vuelta por el formato de Firestore', () => {
   delete w.label;
   assert.deepStrictEqual(back, w);
 });
+
+test('los PDF van en trozos de bytes', () => {
+  const bytes = Uint8Array.from({ length: 70000 }, (_, i) => (i * 31) % 256);
+  const v = toValue({ id: 'f1-0', file: 'f1', data: bytes });
+  assert.strictEqual(typeof v.mapValue.fields.data.bytesValue, 'string');
+  assert.deepStrictEqual(fromValue(v).data, bytes);
+});

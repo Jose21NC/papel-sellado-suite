@@ -17,7 +17,7 @@ Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de
 | `css/app.css` | Estilos con variables en `:root` (claro/oscuro), estética minimalista tipo Apple; reglas de papel e impresión |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB por cuenta (`DB.use(uid)`): `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) y `outbox` (cambios por subir); `DB.onChange` avisa a la nube |
-| `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña), Firestore y Storage de Firebase por REST, sin SDK; cola de subida, `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
+| `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña) y Firestore de Firebase por REST, sin SDK ni Storage: los PDF van en trozos (`chunks`) de 750 KB; cola de subida (cada 20 s como máximo, por la cuota gratuita), `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
 | `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp); `write()` arma el PDF descargable (una imagen JPEG por página) |
 | `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF»; «Ocultar lo impreso» marca los primeros `work.printedChars` caracteres con `CSS.highlights` (`::highlight(impreso)`) y sus guiones con `.dash.impreso` |
 | `js/app.js` | Pantalla de entrada (`login`, `openAccount`), rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), protocolo del año (`w.protocolo = año`, `addToProtocol`, importar .docx), respaldo, bloqueo de una sola pestaña |
@@ -42,6 +42,6 @@ No hay paso de compilación: publicar es `git push` a `main` (Hostinger lo despl
 
 ## Estado y pendientes conocidos
 - Sin probar en Safari ni Firefox.
-- Firebase: probado contra un Firebase simulado, falta probarlo con un proyecto real. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
+- Firebase: probado contra un Firebase simulado; contra el proyecto real lexia-suite (plan Spark, sin Storage) entran y salen las cuentas, falta publicar `firebase/firestore.rules` para guardar datos. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
 - En el celular la barra del editor se desplaza de lado (a propósito: no cabe en una fila).
 - Plantillas: son modelos; la base legal de la frase del quinquenio y los requisitos actuales de Migración para menores no se verificaron.

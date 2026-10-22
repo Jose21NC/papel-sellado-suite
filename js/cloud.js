@@ -1,10 +1,15 @@
 // Cuenta y nube con Firebase, por sus APIs REST (sin SDK ni dependencias): Authentication (correo y
-// contraseña), Firestore (trabajos, papel, ajustes) y Storage (los PDF). Todo vive en users/{uid}/…
+// contraseña) y Firestore, que guarda trabajos, papel y ajustes, y también los PDF partidos en trozos (chunks),
+// para no depender de Storage, que exige el plan de pago. Todo vive en users/{uid}/…
 // IndexedDB sigue siendo la copia de trabajo: cada cambio entra a la cola `outbox` y se sube en segundo plano.
 (function (root) {
   // ---------- valores de Firestore ----------
+  const toB64 = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
+  const fromB64 = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+
   function toValue(v) {
     if (v === null || v === undefined) return { nullValue: null };
+    if (v instanceof Uint8Array) return { bytesValue: toB64(v) };
     if (typeof v === 'boolean') return { booleanValue: v };
     if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
     if (typeof v === 'string') return { stringValue: v };
@@ -18,6 +23,7 @@
     if ('integerValue' in v) return Number(v.integerValue);
     if ('doubleValue' in v) return v.doubleValue;
     if ('booleanValue' in v) return v.booleanValue;
+    if ('bytesValue' in v) return fromB64(v.bytesValue);
     if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromValue);
     if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, fromValue(x)]));
     return null;
@@ -93,13 +99,12 @@
     try { localStorage.removeItem(SESSION); } catch {}
   }
 
-  // ---------- Firestore y Storage ----------
+  // ---------- Firestore ----------
   const docs = () => `https://firestore.googleapis.com/v1/projects/${C.projectId}/databases/(default)/documents/users/${session.uid}`;
-  const object = (id) => `https://firebasestorage.googleapis.com/v0/b/${C.storageBucket}/o/${encodeURIComponent(`users/${session.uid}/files/${id}.pdf`)}`;
 
-  async function req(url, opts = {}, scheme = 'Bearer') {
+  async function req(url, opts = {}) {
     let r;
-    try { r = await fetch(url, { ...opts, headers: { Authorization: `${scheme} ${await token()}`, ...opts.headers } }); } catch (err) {
+    try { r = await fetch(url, { ...opts, headers: { Authorization: `Bearer ${await token()}`, ...opts.headers } }); } catch (err) {
       if (err.code) throw err;
       throw Object.assign(new Error('Sin conexión con Firebase.'), { offline: true });
     }
@@ -124,9 +129,30 @@
   });
   const delDoc = (store, id) => req(`${docs()}/${store}/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
-  const upload = (id, blob) => req(`https://firebasestorage.googleapis.com/v0/b/${C.storageBucket}/o?name=${encodeURIComponent(`users/${session.uid}/files/${id}.pdf`)}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: blob }, 'Firebase');
-  const fileBlob = async (id) => new Blob([await (await req(object(id) + '?alt=media', {}, 'Firebase')).blob()], { type: 'application/pdf' });
+  // Un documento de Firestore admite 1 MB: cada PDF va en trozos chunks/{archivo}-{k}; devuelve cuántos.
+  const CHUNK = 750 * 1024;
+  async function upload(id, blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const n = Math.max(1, Math.ceil(bytes.length / CHUNK));
+    for (let k = 0; k < n; k++) await putDoc('chunks', { id: `${id}-${k}`, file: id, data: bytes.subarray(k * CHUNK, (k + 1) * CHUNK) });
+    return n;
+  }
+
+  async function fileBlob(id, n) {
+    const parts = [];
+    for (let k = 0; k < n; k++) parts.push(fromValue((await (await req(`${docs()}/chunks/${id}-${k}`)).json()).fields.data));
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+
+  // Los trozos de un archivo borrado: se listan solo con su campo `file`, sin bajar los datos.
+  async function delChunks(id) {
+    let page = '';
+    do {
+      const j = await (await req(`${docs()}/chunks?pageSize=300&mask.fieldPaths=file${page ? '&pageToken=' + page : ''}`)).json();
+      for (const d of j.documents || []) if (d.fields?.file?.stringValue === id) await req(`https://firestore.googleapis.com/v1/${d.name}`, { method: 'DELETE' });
+      page = j.nextPageToken || '';
+    } while (page);
+  }
 
   // ---------- sincronización ----------
   const SYNCED = ['settings', 'papers', 'works', 'files'];
@@ -136,8 +162,9 @@
     if (!session || !SYNCED.includes(store)) return;
     const at = Date.now();
     await DB.putMany('outbox', ids.map((id) => ({ id: `${store}/${id}`, store, doc: id, op, at })), true);
-    clearTimeout(timer);
-    timer = setTimeout(flush, 1500);
+    // Sin reiniciar el plazo: al escribir sin parar se sube cada 20 s, no en cada tecla (el plan gratuito de
+    // Firestore permite 20 000 escrituras al día para todo el proyecto).
+    if (!timer) timer = setTimeout(() => { timer = 0; flush(); }, 20000);
   }
 
   // Sube la cola en orden. Un documento que Firebase rechaza (p. ej. por tamaño) no detiene a los demás.
@@ -152,12 +179,13 @@
           try {
             if (o.op === 'del') {
               await delDoc(o.store, o.doc);
-              if (o.store === 'files') await req(object(o.doc), { method: 'DELETE' }, 'Firebase');
+              if (o.store === 'files') await delChunks(o.doc);
             } else {
               const v = await DB.get(o.store, o.doc);
               if (v && o.store === 'files') {
-                if (v.blob) await upload(v.id, v.blob);
-                await putDoc('files', { id: v.id, name: v.name, addedAt: v.addedAt });
+                const chunks = v.blob ? await upload(v.id, v.blob) : v.chunks;
+                await putDoc('files', { id: v.id, name: v.name, addedAt: v.addedAt, chunks });
+                if (v.chunks !== chunks) await DB.put('files', { ...v, chunks }, true);
               } else if (v) await putDoc(o.store, v);
             }
             if ((await DB.get('outbox', o.id))?.at === o.at) await DB.del('outbox', o.id, true); // si cambió mientras subía, queda
@@ -195,6 +223,7 @@
 
   // Al volver la conexión o cada minuto, se reintenta lo pendiente.
   root.addEventListener('online', () => flush());
+  document.addEventListener('visibilitychange', () => { if (document.hidden && status.pending + (timer ? 1 : 0)) { clearTimeout(timer); timer = 0; flush(); } });
   setInterval(() => { if (session && status.pending) flush(); }, 60000);
 
   root.Cloud = {
