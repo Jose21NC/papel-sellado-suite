@@ -8,7 +8,7 @@ Sube los PDF, escribe directamente sobre los renglones del papel e imprime con o
 ## Qué hace
 
 - **Inventario de papel sellado.** Arrastre uno o varios PDF. La suite lee de cada hoja el **tipo** (testimonio / protocolo), el **valor** (C$21, C$14, …), la **serie** y el **número**, y agrupa el inventario por valor. Detecta hojas repetidas. Puede marcar una hoja como **anulada** (inutilizada).
-- **Editor sobre el papel.** El texto se escribe encima del papel, línea por línea sobre los 30 renglones de cada cara (frente y reverso). Al llenarse una cara, el texto pasa solo a la siguiente: frente → reverso → siguiente hoja. Junto al escudo del frente, los renglones 1 a 3 se respetan.
+- **Editor sobre el papel.** El texto se escribe encima del papel, línea por línea sobre los 30 renglones de cada cara (frente y reverso). Al llenarse una cara, el texto pasa solo a la siguiente: frente → reverso → siguiente hoja. Junto al escudo y al código de barras del frente, los renglones 1 a 4 empiezan más a la derecha (en pantalla se ve esa zona rayada; no se imprime).
 - **Formato.** Negrita, cursiva, subrayado, MAYÚSCULAS/minúsculas, alineación (justificado por defecto), tipo y tamaño de letra, sangría, espacio entre letras, márgenes y altura del texto sobre el renglón. Opción de **cerrar los renglones con guiones** para no dejar espacios en blanco.
 - **Pegar desde Word.** Al pegar, se conservan la negrita, la cursiva, el subrayado y la alineación. Se quita lo que movería el texto fuera de los renglones (tamaños y fuentes mezclados).
 - **Impresión.**

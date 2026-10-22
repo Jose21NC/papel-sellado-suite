@@ -78,7 +78,8 @@ const Editor = (() => {
     const seal = page.querySelector('.seal');
     const sealW = sideFor(i) === 'frente' ? g.sealRight + 4 - left : 0;
     seal.style.width = Math.max(0, sealW) + 'pt';
-    seal.style.height = sealW > 0 ? g.sealLines * L + 'pt' : '0';
+    // Los renglones cortos son sealLines, pero el código de barras baja hasta el siguiente: se reserva uno más.
+    seal.style.height = sealW > 0 ? (g.sealLines + 1) * L + 'pt' : '0';
 
     const paper = paperFor(i);
     const bg = page.querySelector('.bg');
@@ -94,8 +95,12 @@ const Editor = (() => {
       }
     } else {
       bg.dataset.key = '';
-      bg.innerHTML = Array.from({ length: g.lines }, (_, k) =>
-        `<div class="rule" style="top:${g.firstRule + k * L}pt;left:${g.left}pt;width:${g.right - g.left}pt"><span>${k + 1}</span></div>`).join('');
+      // Como en el papel: en el frente los primeros renglones empiezan después del sello.
+      const short = sideFor(i) === 'frente' ? g.sealLines : 0;
+      bg.innerHTML = Array.from({ length: g.lines }, (_, k) => {
+        const x = k < short ? g.sealRight : g.left;
+        return `<div class="rule" style="top:${g.firstRule + k * L}pt;left:${x}pt;width:${g.right - x}pt"><span style="left:${g.left - x - 22}pt">${k + 1}</span></div>`;
+      }).join('');
     }
     if (i % 2 === 0) renderSheetBar(i / 2);
   }
@@ -145,8 +150,12 @@ const Editor = (() => {
     for (const el of ed.querySelectorAll('[align]')) { if (el.nodeName === 'P') el.style.textAlign = el.getAttribute('align'); el.removeAttribute('align'); }
     for (const el of ed.querySelectorAll('[style]')) {
       // El tamaño y la interlínea son únicos para todo el documento: así cada línea cae sobre su renglón.
-      if (el.nodeName === 'P') { const a = el.style.textAlign; el.removeAttribute('style'); if (a) el.style.textAlign = a; }
-      else el.removeAttribute('style');
+      if (el.nodeName === 'P') { const a = el.style.textAlign; el.removeAttribute('style'); if (a) el.style.textAlign = a; continue; }
+      // Al quitar un formato, Chrome deja los demás como style (<u style="font-weight: bold">): se pasan a etiquetas.
+      const st = el.style;
+      const tags = [/^(bold|bolder|[6-9]00)$/.test(st.fontWeight) && 'b', st.fontStyle === 'italic' && 'i', /underline/.test(st.textDecorationLine) && 'u'].filter(Boolean);
+      el.removeAttribute('style');
+      for (const t of tags) { const w = document.createElement(t); w.append(...el.childNodes); el.append(w); }
     }
     for (const el of ed.querySelectorAll('font, span:not([class])')) el.replaceWith(...el.childNodes);
     const ps = ed.children;
@@ -380,7 +389,7 @@ const Editor = (() => {
     const k = pr.width / parseFloat(page.style.width); // px de pantalla por pt
     const area = ed.parentNode.getBoundingClientRect();
     const lineH = area.height / Number(ed.dataset.lines);
-    const sealRight = ed.previousElementSibling.getBoundingClientRect().right;
+    const seal = ed.previousElementSibling.getBoundingClientRect();
     const add = (x0, x1, top) => { if (x1 - x0 >= 6 * k) out.push([(x0 - pr.left) / k, (top - pr.top) / k, (x1 - x0) / k]); };
     for (const p of ed.children) {
       if (p.hasAttribute('data-split')) continue;
@@ -389,7 +398,7 @@ const Editor = (() => {
       const lineTop = pRect.bottom - lineH;
       range.selectNodeContents(p);
       const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.top + r.height / 2 > lineTop);
-      const minX = lineTop < area.top + lineH * 3 ? Math.max(area.left, sealRight) : area.left;
+      const minX = lineTop + lineH / 2 < seal.bottom ? Math.max(area.left, seal.right) : area.left;
       if (!rects.length) { add(minX, area.right, lineTop); continue; }
       const textL = Math.min(...rects.map((r) => r.left)), textR = Math.max(...rects.map((r) => r.right));
       const align = p.style.textAlign;
@@ -408,6 +417,7 @@ const Editor = (() => {
   }
 
   function snapshot() {
+    keepStyle = false;
     undoStack.push(currentHtml());
     if (undoStack.length > 200) undoStack.shift();
     redoStack = [];
@@ -415,6 +425,7 @@ const Editor = (() => {
   }
 
   function applyHtml(html) {
+    keepStyle = false;
     setPageCount(Math.max(html.length, work.paperIds.length * 2));
     html.forEach((h, i) => { eds[i].innerHTML = h; });
     restoreSelection(true);
@@ -597,7 +608,8 @@ const Editor = (() => {
     if (e.inputType === 'historyRedo') { e.preventDefault(); redo(); return; }
     if (e.inputType === 'insertLineBreak') { e.preventDefault(); snapshot(); document.execCommand('insertParagraph'); return; }
     const group = e.inputType.startsWith('insertText') ? 'text' : e.inputType.startsWith('delete') ? 'del' : e.inputType;
-    if (group !== lastGroup || Date.now() - lastSnapAt > 1500 || (group !== 'text' && group !== 'del')) snapshot();
+    if (keepStyle) { keepStyle = false; lastSnapAt = Date.now(); } // la instantánea ya se tomó al dar formato
+    else if (group !== lastGroup || Date.now() - lastSnapAt > 1500 || (group !== 'text' && group !== 'del')) snapshot();
     lastGroup = group;
   }
 
@@ -656,11 +668,29 @@ const Editor = (() => {
   // ---------- comandos de formato ----------
   const hostOf = (n) => (n.nodeType === 1 ? n : n.parentNode)?.closest?.('.ed');
   const spansPages = () => { const s = getSelection(); return s.rangeCount > 0 && !s.isCollapsed && hostOf(s.anchorNode) !== hostOf(s.focusNode); };
+  const TOGGLES = ['bold', 'italic', 'underline'];
+  let keepStyle = false; // hay un estilo pendiente para lo próximo que se escriba y su instantánea ya se tomó
+
+  // N, K y S muestran el formato donde está el cursor (o el pendiente para lo próximo que se escriba).
+  function syncButtons() {
+    const s = getSelection();
+    const inEd = s.rangeCount > 0 && root.contains(s.anchorNode) && !!hostOf(s.anchorNode);
+    for (const cmd of TOGGLES) document.querySelector(`.toolbar [data-cmd="${cmd}"]`)?.setAttribute('aria-pressed', inEd && document.queryCommandState(cmd));
+  }
 
   function format(cmd, value) {
     const sel = getSelection();
     if (!sel.rangeCount || !root.contains(sel.anchorNode)) { ctx.status('Primero haga clic en el texto'); return; }
     if (spansPages()) { ctx.status('Para dar formato, seleccione texto dentro de una misma página'); return; }
+    // Sin selección, el navegador guarda el estilo para lo que se escriba después; mover el cursor (los
+    // marcadores de reflow o de una instantánea) lo borraría, así que no se toca nada más.
+    if (sel.isCollapsed && TOGGLES.includes(cmd)) {
+      if (!keepStyle) snapshot();
+      document.execCommand(cmd);
+      keepStyle = true;
+      syncButtons();
+      return;
+    }
     snapshot();
     lastGroup = '';
     if (cmd === 'upper' || cmd === 'lower') {
@@ -693,6 +723,7 @@ const Editor = (() => {
     }
     const ed = sel.anchorNode && hostOf(sel.anchorNode);
     reflow(Math.max(0, eds.indexOf(ed) - 1));
+    syncButtons();
   }
 
   // ---------- API ----------
@@ -715,6 +746,7 @@ const Editor = (() => {
       root.addEventListener('paste', onPaste);
       root.addEventListener('drop', onDrop);
       document.addEventListener('copy', onCopy); // con la selección en varias páginas el evento no siempre nace dentro
+      document.addEventListener('selectionchange', syncButtons);
       root.addEventListener('input', (e) => { const ed = e.target.closest?.('.ed'); if (ed) schedule(eds.indexOf(ed) - 1); });
       root.addEventListener('compositionstart', () => { composing = true; });
       root.addEventListener('compositionend', (e) => { composing = false; const ed = e.target.closest?.('.ed'); if (ed) schedule(eds.indexOf(ed) - 1); });
