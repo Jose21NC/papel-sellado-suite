@@ -15,7 +15,7 @@ Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de
 |---|---|
 | `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-perfil` con Mis datos y respaldo, `#view-editor`), barra del editor y todos los `<dialog>` |
 | `css/app.css` | Estilos con variables en `:root` (paleta de Lexia: `--navy` #1B365D y `--sky` #4BB3DB). Claro por omisión; oscuro con `html[data-theme="dark"]` (botón `#btn-theme`, guardado en `localStorage` `lexia-theme` y aplicado en el `<head>` antes de pintar). Animaciones con `--ease`/`--spring`: secciones que suben escalonadas, diálogos y menú con `@starting-style`; se apagan con `prefers-reduced-motion`. Nunca animar `.page` ni sus hijos: se miden al paginar. Reglas de papel e impresión |
-| `img/logo.svg` | Logo (favicon); en la página va como `<symbol id="logo">` dentro de `index.html`, con los colores de la paleta |
+| `img/logo.svg` | Logo (favicon); en la página va como `<symbol id="logo">` dentro de `index.html`, con los colores de la paleta. `img/og.jpg` (vista previa al compartir) y `img/apple-touch-icon.png` salen del mismo logo |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB por cuenta (`DB.use(uid)`): `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) y `outbox` (cambios por subir); `DB.onChange` avisa a la nube |
 | `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña) y Firestore de Firebase por REST, sin SDK ni Storage: los PDF van en trozos (`chunks`) de 750 KB; cola de subida (cada 20 s como máximo, por la cuota gratuita), `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
@@ -33,7 +33,7 @@ Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de
 npm test                         # pruebas (node --test)
 npm run serve                    # http://localhost:8000
 ```
-No hay paso de compilación: publicar es `git push` a `main` (Hostinger lo despliega si está activada la implementación automática; ver `PUBLICAR.md`). `.htaccess` fuerza HTTPS, evita copias viejas en caché y oculta `.git`.
+No hay paso de compilación. Publicar: `./deploy.sh` (rsync por SSH a Hostinger, solo `index.html`, `.htaccess`, `css/`, `js/`, `img/`, `vendor/`; pide la contraseña, que nunca va al repo) o `git push` a `main` si está activada la implementación automática (ver `PUBLICAR.md`). `.htaccess` fuerza HTTPS, pone encabezados de seguridad, evita copias viejas en caché, comprime y no sirve `.git`, documentación ni pruebas.
 
 ## Cómo verificar cambios
 1. `npm test`.

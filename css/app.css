@@ -410,9 +410,11 @@ dialog label.check { display: flex; align-items: center; gap: 8px; font-weight: 
 @media (max-width: 700px) {
   .top { position: static; padding: 10px 16px; }
   .top .spacer { display: none; }
-  .brand, .tabs { flex: 1 1 100%; }
+  /* Logo y botones (tema, Perfil) en la primera fila; las secciones debajo, a todo el ancho. */
+  .brand { flex: 1; }
+  .tabs { order: 2; flex: 1 1 100%; }
   .tab { flex: 1; }
-  .top-actions { flex-wrap: wrap; margin-left: -10px; }
+  .top-actions .tab { flex: none; }
   main { padding: 20px 16px 48px; }
   .view-head h1 { font-size: 24px; }
   .filters { flex: 1 1 100%; }
@@ -426,6 +428,7 @@ dialog label.check { display: flex; align-items: center; gap: 8px; font-weight: 
   .table-wrap td::before { color: var(--muted); }
   .table-wrap td.actions { flex-basis: 100%; margin: 2px 0 -6px -11px; text-align: left; }
   #works-table td:nth-child(-n+2) { flex-basis: 100%; }
+  .table-wrap td:empty { display: none; }
   #works-table td:first-child { font-size: 15px; }
   #works-table td:nth-child(4)::before { content: "Hojas: "; }
   #works-table td:nth-child(6)::before { content: "Impresiones: "; }

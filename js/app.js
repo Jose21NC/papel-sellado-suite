@@ -420,7 +420,7 @@
         const last = w.printLog[w.printLog.length - 1];
         return `<tr data-id="${esc(w.id)}">
           <td><a href="#trabajo/${esc(w.id)}">${LABELS.includes(w.label) ? `<span class="tag ${w.label}" title="Etiqueta ${w.label}"></span>` : ''}<strong>${esc(w.title)}</strong></a>${w.protocolo ? `<div class="muted">${escrituras(w)} escritura${escrituras(w) === 1 ? '' : 's'}</div>` : ''}</td>
-          <td>${esc(w.client || '—')}</td>
+          <td>${w.protocolo ? '' : esc(w.client || '—')}</td>
           <td><span class="pill ${esc(w.kind)}">${esc(cap(w.kind))}${w.paperValue ? ' C$' + esc(w.paperValue) : ''}</span></td>
           <td>${sheets} <span class="muted">(${assigned} con papel)</span></td>
           <td>${w.protocolo ? (w.protocolo >= thisYear() ? '<span class="pill impreso" title="Se cierra el 31 de diciembre">Activo</span>' : '<span class="pill">Cerrado</span>') : `<span class="pill ${esc(w.status)}">${esc(cap(w.status))}</span>`}</td>
