@@ -14,7 +14,7 @@ Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de
 | Archivo | Qué hace |
 |---|---|
 | `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-perfil` con Mis datos y respaldo, `#view-editor`), barra del editor y todos los `<dialog>` |
-| `css/app.css` | Estilos con variables en `:root` (claro/oscuro; paleta de Lexia: `--navy` #1B365D y `--sky` #4BB3DB), estética minimalista; reglas de papel e impresión |
+| `css/app.css` | Estilos con variables en `:root` (paleta de Lexia: `--navy` #1B365D y `--sky` #4BB3DB). Claro por omisión; oscuro con `html[data-theme="dark"]` (botón `#btn-theme`, guardado en `localStorage` `lexia-theme` y aplicado en el `<head>` antes de pintar). Animaciones con `--ease`/`--spring`: secciones que suben escalonadas, diálogos y menú con `@starting-style`; se apagan con `prefers-reduced-motion`. Nunca animar `.page` ni sus hijos: se miden al paginar. Reglas de papel e impresión |
 | `img/logo.svg` | Logo (favicon); en la página va como `<symbol id="logo">` dentro de `index.html`, con los colores de la paleta |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
 | `js/db.js` | IndexedDB por cuenta (`DB.use(uid)`): `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) y `outbox` (cambios por subir); `DB.onChange` avisa a la nube |

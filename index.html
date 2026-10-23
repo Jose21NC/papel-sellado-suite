@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lexia</title>
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <!-- El modo oscuro se aplica antes de pintar para que no parpadee en claro. -->
+  <script>try { if (localStorage.getItem('lexia-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -37,6 +39,7 @@
     </nav>
     <div class="spacer"></div>
     <div class="top-actions">
+      <button class="icon-btn" id="btn-theme" aria-label="Cambiar a modo oscuro" title="Modo oscuro"><svg class="ico moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"/></svg><svg class="ico sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"/></svg></button>
       <button class="tab tab-perfil" data-route="perfil" title="Mis datos y respaldo"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.75 14c.6-2.7 2.7-4.25 5.25-4.25s4.65 1.55 5.25 4.25"/></svg>Perfil</button>
     </div>
   </header>

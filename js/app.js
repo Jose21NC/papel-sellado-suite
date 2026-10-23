@@ -622,6 +622,28 @@
 
   $('#btn-datos').addEventListener('click', () => $('#dlg-datos').showModal());
 
+  // Modo claro (por omisión) u oscuro; se recuerda en este navegador. El cambio se abre en círculo desde el botón.
+  const root = document.documentElement;
+  function syncTheme() {
+    const dark = root.dataset.theme === 'dark';
+    $('#btn-theme').setAttribute('aria-label', dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    $('#btn-theme').title = dark ? 'Modo claro' : 'Modo oscuro';
+  }
+  $('#btn-theme').addEventListener('click', (e) => {
+    const dark = root.dataset.theme !== 'dark';
+    const apply = () => { if (dark) root.dataset.theme = 'dark'; else delete root.dataset.theme; syncTheme(); };
+    try { localStorage.setItem('lexia-theme', dark ? 'dark' : 'light'); } catch {}
+    if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { apply(); return; }
+    const r = e.currentTarget.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const end = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    root.classList.add('theme-switch');
+    const t = document.startViewTransition(apply);
+    t.ready.then(() => root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${end}px at ${x}px ${y}px)`] },
+      { duration: 550, easing: 'cubic-bezier(.22,1,.36,1)', pseudoElement: '::view-transition-new(root)' }));
+    t.finished.finally(() => root.classList.remove('theme-switch'));
+  });
+  syncTheme();
+
   // Fondo en pantalla: normal, atenuado u oculto (la impresión no cambia). Se recuerda en este navegador.
   function setBg(mode) {
     document.body.classList.remove('bg-dim', 'bg-off');
