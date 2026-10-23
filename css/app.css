@@ -124,7 +124,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 
 /* ---------- tarjetas y tablas ---------- */
 /* Entrar o crear cuenta: ocupa toda la página hasta que haya sesión; a la izquierda la marca. */
-body.auth-view > :not(#auth):not(.toast):not(svg) { display: none !important; }
+body.auth-view > :not(.auth):not(.toast):not(svg) { display: none !important; }
 .auth { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100vh; }
 .auth-brand { display: grid; align-content: center; justify-items: center; gap: 14px; padding: 48px 32px; text-align: center; color: #fff;
   background: radial-gradient(circle at 30% 20%, rgba(75,179,219,.35), transparent 55%), linear-gradient(160deg, #1B365D, #0f2340); }
@@ -147,6 +147,23 @@ body.auth-view > :not(#auth):not(.toast):not(svg) { display: none !important; }
 .auth-card input { height: 42px; font-size: 15px; }
 .auth-card .btn.primary { width: 100%; height: 42px; font-size: 15px; }
 .auth-card .linklike { justify-self: center; }
+/* Muro de pago */
+.perks { display: grid; gap: 10px; max-width: 340px; margin: 6px 0 0; padding: 0; list-style: none; text-align: left; animation: rise .7s var(--ease) .25s backwards; }
+.perks li { position: relative; padding-left: 28px; color: rgba(255,255,255,.88); font-size: 15px; line-height: 1.4; }
+.perks li::before { content: ""; position: absolute; left: 0; top: 1px; width: 18px; height: 18px; border-radius: 50%; background: var(--sky)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 8.2 2.3 2.3 4.7-5'/%3E%3C/svg%3E") center / 14px no-repeat; }
+.price { display: flex; align-items: baseline; gap: 6px; color: var(--navy); font-size: 52px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.price span { font-size: 22px; font-weight: 700; }
+.price small { margin-left: 6px; color: var(--muted); font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.pay-link { width: 100%; height: 42px; font-size: 15px; text-decoration: none !important; }
+#pay-submit { width: 100%; height: 40px; }
+.coupon summary { width: fit-content; color: var(--accent-text); font-weight: 500; cursor: pointer; list-style: none; }
+.coupon summary::-webkit-details-marker { display: none; }
+.coupon[open] summary { margin-bottom: 8px; }
+.coupon-row { display: flex; gap: 8px; animation: rise .35s var(--ease); }
+.coupon-row input { flex: 1; min-width: 0; text-transform: uppercase; }
+.coupon-row .btn { height: 42px; }
+.auth-card .hint { font-size: 12px; line-height: 1.45; }
 .auth-error { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--red-bg); color: var(--red); font-size: 13px; }
 .auth-error:empty { display: none; }
 @media (max-width: 760px) {

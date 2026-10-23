@@ -109,6 +109,8 @@
     $('#cuenta-info').textContent = u ? u.email : 'Esta copia de Lexia no tiene Firebase configurado: todo se guarda solo en este navegador.';
     $('#cuenta-sync').textContent = !u ? '' : st.pending ? `${st.pending} cambio${st.pending === 1 ? '' : 's'} por subir a su cuenta.${st.error ? ' ' + st.error : ''}` : 'Todo está guardado en su cuenta.';
     $('#btn-logout').hidden = !u;
+    const via = { pago: 'pago único', cupon: 'cupón', anterior: 'cuenta fundadora' }[licencia?.via];
+    $('#cuenta-licencia').textContent = u && licencia?.estado === 'activa' ? `Lexia activa (${via}).` : '';
     const p = Profile.get();
     $('#perfil-resumen').textContent = p.nombre ? `${p.nombre}${p.titulo ? ' · ' + p.titulo : ''}` : 'Todavía no ha guardado sus datos.';
   }
@@ -173,6 +175,80 @@
     if (!(await confirmDialog('Datos en este navegador', `Este navegador tiene ${old.works.length} trabajos y ${old.papers.length} hojas de papel sellado guardados sin cuenta. ¿Pasarlos a su cuenta?`, 'Pasarlos a mi cuenta'))) return;
     for (const s of ['files', 'papers', 'works', 'settings']) await DB.putMany(s, old[s]);
     toast('Subiendo sus datos a su cuenta…');
+  }
+
+  // ---------- muro de pago ----------
+  // Un solo pago de C$ 800 por cuenta (enlace de Poket) o un cupón. El acceso es inmediato al escribir el comprobante:
+  // el administrador lo revisa en Poket y, si no aparece, cambia la licencia a «desactivada» desde la consola.
+  // Las cuentas creadas antes del muro no pagan.
+  const CUPONES = ['BOREALABS']; // exentan del 100 %; el mismo código está en firebase/firestore.rules
+  const MURO_DESDE = Date.parse('2026-10-23T01:00:00Z');
+  const PRECIO = 800;
+  let licencia = null; // { estado, via } para mostrarla en Perfil
+  const licKey = () => `lexia-licencia-${Cloud.user().uid}`;
+
+  async function paywall() {
+    try {
+      licencia = await Cloud.license() || ((await Cloud.createdAt()) < MURO_DESDE ? { estado: 'activa', via: 'anterior' } : null);
+      try { localStorage.setItem(licKey(), JSON.stringify(licencia)); } catch {}
+    } catch (err) {
+      console.error(err);
+      try { licencia = JSON.parse(localStorage.getItem(licKey())); } catch {} // sin conexión: lo último que se supo
+    }
+    if (licencia?.estado === 'activa') return;
+    await showPaywall();
+  }
+
+  function showPaywall() {
+    document.body.classList.add('auth-view');
+    $('#paywall').hidden = false;
+    const f = $('#pay-form'), err = $('#pay-error');
+    const busy = (on) => { for (const b of f.querySelectorAll('button')) b.disabled = on; };
+    $('#pay-email').textContent = `Cuenta: ${Cloud.user().email}.`;
+    // Una licencia desactivada no se puede volver a crear: solo el administrador la reactiva.
+    const off = !!licencia;
+    for (const el of f.querySelectorAll('.price, .pay-link, label, #pay-submit, .coupon')) el.hidden = off;
+    $('#pay-sub').textContent = off ? 'Su pago no se pudo verificar con Poket y Lexia quedó desactivada en esta cuenta. Si ya pagó, envíe su comprobante a soporte para reactivarla.'
+      : 'Un solo pago, sin mensualidades. Lexia queda activa para siempre en su cuenta.';
+    $('#pay-logout').onclick = async () => { Cloud.signOut(); await DB.drop(); location.reload(); };
+    return new Promise((resolve) => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        err.textContent = '';
+        // Enter en el cupón también lo aplica (el botón por omisión del formulario es «Ya pagué»).
+        const viaCupon = e.submitter?.value === 'cupon' || document.activeElement === f.cupon;
+        let data;
+        if (viaCupon) {
+          const code = f.cupon.value.trim().toUpperCase();
+          if (!CUPONES.includes(code)) { err.textContent = 'Ese cupón no es válido.'; return; }
+          data = { via: 'cupon', cupon: code };
+        } else {
+          const ref = f.comprobante.value.trim();
+          if (!/^[A-Za-z0-9-]{4,40}$/.test(ref)) { err.textContent = 'Escriba el número de comprobante que le dio Poket al terminar el pago.'; return; }
+          data = { via: 'pago', comprobante: ref, monto: PRECIO };
+        }
+        busy(true);
+        try {
+          await Cloud.createLicense({ ...data, estado: 'activa', email: Cloud.user().email, fecha: now() });
+          licencia = { estado: 'activa', via: data.via };
+        } catch (e2) {
+          // Ya existía (p. ej. se activó en otra computadora): vale la que está guardada.
+          if (e2.status === 409) licencia = await Cloud.license().catch(() => null);
+          if (licencia?.estado !== 'activa') {
+            err.textContent = e2.offline ? 'Sin conexión: revise su internet e intente de nuevo.' : `No se pudo activar Lexia. Intente de nuevo en un momento. (${e2.message})`;
+            busy(false);
+            return;
+          }
+        }
+        try { localStorage.setItem(licKey(), JSON.stringify(licencia)); } catch {}
+        f.reset();
+        busy(false);
+        $('#paywall').hidden = true;
+        document.body.classList.remove('auth-view');
+        toast(data.via === 'cupon' ? 'Cupón aplicado: Lexia está activa en su cuenta.' : '¡Gracias! Lexia está activa en su cuenta.');
+        resolve();
+      };
+    });
   }
 
   $('#btn-logout').addEventListener('click', async () => {
@@ -1039,6 +1115,7 @@
     if (Cloud.enabled) {
       if (!Cloud.resume()) await login();
       await openAccount();
+      await paywall();
     }
     try {
       navigator.storage?.persist?.(); // pide al navegador no borrar los datos por falta de espacio

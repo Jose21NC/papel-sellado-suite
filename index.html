@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lexia</title>
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <meta name="description" content="Lexia: escrituras, protocolo y papel sellado de la DGI de Nicaragua. Escriba sobre los renglones e imprima exacto.">
+  <meta name="theme-color" content="#1B365D">
   <!-- El modo oscuro se aplica antes de pintar para que no parpadee en claro. -->
   <script>try { if (localStorage.getItem('lexia-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
   <link rel="stylesheet" href="css/app.css">
@@ -28,6 +30,38 @@
       <button class="btn primary" id="auth-submit">Entrar</button>
       <button type="button" class="linklike" id="auth-switch">¿No tiene cuenta? Crear una</button>
       <button type="button" class="linklike" id="auth-reset">¿Olvidó su contraseña?</button>
+    </form>
+  </section>
+
+  <!-- Muro de pago: un solo pago por cuenta (o un cupón) -->
+  <section id="paywall" class="auth" hidden>
+    <div class="auth-brand">
+      <svg class="auth-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <div class="auth-name">LEXIA</div>
+      <ul class="perks">
+        <li>59 plantillas notariales que se llenan solas</li>
+        <li>Su protocolo del año, siempre al día</li>
+        <li>Impresión exacta sobre los renglones de la DGI</li>
+        <li>Sus documentos en la nube, en cualquier computadora</li>
+      </ul>
+    </div>
+    <form class="auth-card" id="pay-form" novalidate>
+      <h1>Active Lexia</h1>
+      <p class="muted" id="pay-sub">Un solo pago, sin mensualidades. Lexia queda activa para siempre en su cuenta.</p>
+      <div class="price"><span>C$</span>800<small>pago único</small></div>
+      <a class="btn primary pay-link" id="pay-link" href="https://pagoconpoket.com/merchant/49b0e861-b261-4a15-8e15-730acdcfc530/link/373a96c4-540c-48ae-a4e1-d46afd160114" target="_blank" rel="noopener">1. Pagar C$ 800 con Poket</a>
+      <label>2. Número de comprobante de Poket <input type="text" name="comprobante" autocomplete="off" placeholder="El que aparece al terminar el pago"></label>
+      <button class="btn" id="pay-submit" value="pago">Ya pagué: activar Lexia</button>
+      <p class="auth-error" id="pay-error" role="alert"></p>
+      <details class="coupon" id="coupon">
+        <summary>¿Tiene un cupón?</summary>
+        <div class="coupon-row">
+          <input type="text" name="cupon" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Código" aria-label="Código del cupón">
+          <button class="btn" value="cupon">Aplicar</button>
+        </div>
+      </details>
+      <p class="hint muted">Cada comprobante se verifica con Poket; si el pago no aparece, la cuenta se desactiva. <span id="pay-email"></span></p>
+      <button type="button" class="linklike" id="pay-logout">Entrar con otra cuenta</button>
     </form>
   </section>
 
@@ -102,6 +136,7 @@
         <div class="panel">
           <h2>Cuenta</h2>
           <p class="muted" id="cuenta-info"></p>
+          <p class="muted" id="cuenta-licencia"></p>
           <p class="muted" id="cuenta-sync"></p>
           <button class="btn" id="btn-logout" hidden>Cerrar sesión</button>
         </div>

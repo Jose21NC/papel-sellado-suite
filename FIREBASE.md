@@ -27,7 +27,7 @@ Sin configurar (`js/firebase-config.js` vacío), Lexia funciona como siempre: si
 
 1. Entre a https://console.firebase.google.com y cree un proyecto. Google Analytics no hace falta.
 2. **Authentication › Comenzar › Correo electrónico/contraseña:** actívelo.
-3. **Firestore Database › Crear base de datos:** modo de producción, en la región más cercana (p. ej. `us-central1`). Luego, en **Reglas**, pegue `firebase/firestore.rules` y publique.
+3. **Firestore Database › Crear base de datos:** modo de producción, en la región más cercana (p. ej. `us-central1`). Luego, en **Reglas**, pegue `firebase/firestore.rules` y publique. **Cada vez que cambie ese archivo, vuelva a pegarlo y publicarlo.**
 4. Storage no hace falta.
 5. **Configuración del proyecto › Tus apps › Web (`</>`):** registre la app y copie `apiKey` y `projectId` en `js/firebase-config.js`. (Hecho para lexia-suite.)
 6. **Authentication › Configuración › Dominios autorizados:** agregue `lexia-suite.cloud` y `www.lexia-suite.cloud` (y `localhost` para probar).
@@ -35,3 +35,27 @@ Sin configurar (`js/firebase-config.js` vacío), Lexia funciona como siempre: si
 La `apiKey` de una app web no es secreta: quien protege los datos son las reglas. Para que nadie use la clave desde otros sitios, en Google Cloud › APIs y servicios › Credenciales se puede restringir a los referentes `https://lexia-suite.cloud/*`, `https://www.lexia-suite.cloud/*` y `http://localhost:8000/*`.
 
 Si se abre `index.html` con doble clic (`file://`), el navegador puede bloquear las llamadas a Firebase. Para usar la cuenta, abra Lexia en línea o con `npm run serve`.
+
+## Muro de pago
+
+Cada cuenta nueva debe activar Lexia una sola vez, con uno de estos dos caminos:
+
+- **Pago de C$ 800 en Poket.** El enlace está en `index.html` (`#pay-link`). El abogado paga, escribe el número de comprobante y entra de inmediato.
+- **Cupón.** `BOREALABS` exenta del 100 %.
+
+Las cuentas creadas antes del 23 de octubre de 2026 a las 01:00 UTC no pagan («cuenta fundadora», `MURO_DESDE` en `js/app.js`).
+
+La activación crea el documento `licencias/{uid}` con `estado: "activa"`, `via` (`pago` o `cupon`), `comprobante` o `cupon`, `email` y `fecha`. Las reglas solo dejan **crearlo una vez**, con un cupón válido o con un comprobante de 4 a 40 letras, números o guiones. Nadie puede cambiarlo ni borrarlo, salvo usted desde la consola.
+
+**Revisar los pagos:**
+
+1. En **Firestore Database › Datos › licencias** verá una licencia por cuenta, con su correo y su comprobante.
+2. Compare con los cobros en su panel de Poket.
+3. Si un comprobante no aparece en Poket, cambie `estado` a `desactivada`. La próxima vez que esa cuenta abra Lexia verá un aviso y no podrá entrar.
+4. Para reactivarla, vuelva a poner `estado` en `activa`.
+
+**Dar acceso gratis a alguien:** cree a mano el documento `licencias/{uid}` con `estado: "activa"` y `via: "manual"`. El `uid` está en **Authentication › Usuarios**.
+
+**Agregar o quitar cupones:** cámbielos en dos lugares, `CUPONES` en `js/app.js` y la lista `['BOREALABS']` en `firebase/firestore.rules`. Luego vuelva a publicar las reglas.
+
+**Límite:** el muro lo hace cumplir la aplicación en el navegador y las reglas protegen la licencia. Pero una persona con conocimientos técnicos que modifique el código en su navegador podría saltarse la pantalla, como en cualquier web sin servidor propio. Para impedirlo del todo haría falta un servidor (p. ej. Cloud Functions, que exige el plan Blaze) que confirme el pago con Poket.

@@ -21,7 +21,7 @@ Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de
 | `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña) y Firestore de Firebase por REST, sin SDK ni Storage: los PDF van en trozos (`chunks`) de 750 KB; cola de subida (cada 20 s como máximo, por la cuota gratuita), `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
 | `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp); `write()` arma el PDF descargable (una imagen JPEG por página) |
 | `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF»; «Ocultar lo impreso» marca los primeros `work.printedChars` caracteres con `CSS.highlights` (`::highlight(impreso)`) y sus guiones con `.dash.impreso` |
-| `js/app.js` | Pantalla de entrada (`login`, `openAccount`), rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), protocolo del año (`w.protocolo = año`, `addToProtocol`, importar .docx), respaldo, bloqueo de una sola pestaña |
+| `js/app.js` | Pantalla de entrada (`login`, `openAccount`), muro de pago (`paywall`: C$ 800 por Poket o cupón `CUPONES`; licencia en `licencias/{uid}`, solo se crea; cuentas anteriores a `MURO_DESDE` exentas), rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), protocolo del año (`w.protocolo = año`, `addToProtocol`, importar .docx), respaldo, bloqueo de una sola pestaña |
 | `js/words.js` | Números, fechas y horas en letras (pruebas en `test/words.test.js`) |
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
 | `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md`. Un clic en un campo `[ASÍ]` abre `#dlg-campo`: `fieldKind`/`fieldText` (con pruebas) deciden cómo se escribe el dato |
@@ -43,6 +43,7 @@ No hay paso de compilación: publicar es `git push` a `main` (Hostinger lo despl
 
 ## Estado y pendientes conocidos
 - Sin probar en Safari ni Firefox.
+- Muro de pago: lo hace cumplir el cliente (las reglas protegen la licencia, no los datos); el pago no se verifica en línea con Poket (no hay webhook): el administrador revisa los comprobantes en la consola. Si cambian los cupones, cambiarlos en `js/app.js` y en `firebase/firestore.rules`.
 - Firebase: probado contra un Firebase simulado y contra el proyecto real lexia-suite (plan Spark, sin Storage), con una cuenta de prueba que se borra al terminar. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
 - En el celular la barra del editor se desplaza de lado (a propósito: no cabe en una fila).
 - Plantillas: son modelos; la base legal de la frase del quinquenio y los requisitos actuales de Migración para menores no se verificaron.

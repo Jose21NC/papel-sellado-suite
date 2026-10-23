@@ -124,6 +124,30 @@
     return out;
   }
 
+  // ---------- licencia (muro de pago) ----------
+  // licencias/{uid} está fuera de users/: el usuario la crea una sola vez (las reglas revisan el cupón o el
+  // comprobante) y solo el administrador la cambia o la borra desde la consola.
+  const licenses = () => `https://firestore.googleapis.com/v1/projects/${C.projectId}/databases/(default)/documents/licencias`;
+
+  // batchGet responde 200 aunque no exista (un GET daría 404, que el navegador anota como error en la consola).
+  async function license() {
+    const base = `projects/${C.projectId}/databases/(default)/documents`;
+    const [r] = await (await req(`https://firestore.googleapis.com/v1/${base}:batchGet`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ documents: [`${base}/licencias/${session.uid}`] }),
+    })).json();
+    return r?.found ? fromValue({ mapValue: { fields: r.found.fields || {} } }) : null;
+  }
+
+  const createLicense = (data) => req(`${licenses()}?documentId=${session.uid}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: toValue(data).mapValue.fields }),
+  });
+
+  // Fecha de creación de la cuenta (ms), para saber si es anterior al muro de pago.
+  async function createdAt() {
+    const j = await post(accounts('lookup'), { idToken: await token() });
+    return Number(j.users?.[0]?.createdAt) || 0;
+  }
+
   const putDoc = (store, value) => req(`${docs()}/${store}/${encodeURIComponent(value.id)}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: toValue(value).mapValue.fields }),
   });
@@ -227,7 +251,7 @@
   setInterval(() => { if (session && status.pending) flush(); }, 60000);
 
   root.Cloud = {
-    enabled, status, signIn, signOut, resetPassword, fileBlob, flush, pull,
+    enabled, status, signIn, signOut, resetPassword, fileBlob, flush, pull, license, createLicense, createdAt,
     user: () => session,
     // Sesión guardada en este navegador (sin validarla: el token se renueva en la primera petición).
     resume() { const s = saved(); if (s?.refreshToken) session = { ...s, idToken: '', exp: 0 }; return session; },
