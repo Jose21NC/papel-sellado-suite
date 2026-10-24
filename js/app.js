@@ -442,15 +442,48 @@
     };
   }
 
-  $('#btn-new-work').addEventListener('click', async () => {
-    const f = $('#dlg-work').querySelector('form');
-    f.reset();
-    const v = await formDialog($('#dlg-work'));
+  // Nuevo trabajo, en blanco o desde un Word (con su texto y su letra); el diálogo pide nombre, partes y papel.
+  async function askWork(fields = {}, doc = null, fileName = '') {
+    const d = $('#dlg-work');
+    d.querySelector('form').reset();
+    $('#work-dlg-title').textContent = doc ? 'Importar documento de Word' : 'Nuevo trabajo';
+    $('#work-dlg-ok').textContent = doc ? 'Importar' : 'Crear';
+    $('#work-dlg-hint').hidden = !doc;
+    if (doc) $('#work-dlg-hint').textContent = `«${fileName}» se acomoda en los renglones del papel sellado, con su negrita, cursiva, subrayado y alineación. Confirme el nombre y las partes.`;
+    const v = await formDialog(d, fields);
     if (!v) return;
     const w = newWork(v);
+    if (doc) {
+      w.pages = [cleanStored(doc.html) || '<p><br></p>'];
+      Object.assign(w.settings, docSettings(doc));
+    }
     await DB.put('works', w);
     state.works.push(w);
     go('trabajo/' + w.id);
+    if (doc) toast('Documento importado: revise el texto antes de imprimir.');
+  }
+
+  // Tipo y tamaño de letra del Word, si la suite los tiene.
+  function docSettings(doc) {
+    const font = FONTS.find(([, label]) => label.toLowerCase() === (doc.font || '').toLowerCase());
+    return { ...(font && { font: font[0] }), ...(doc.size && { size: doc.size }) };
+  }
+
+  async function readDocx(file) {
+    try { return await PS_DOCX.read(await file.arrayBuffer()); } catch (err) {
+      console.error(err);
+      toast('No se pudo leer el archivo: debe ser un documento de Word (.docx).');
+      return null;
+    }
+  }
+
+  $('#btn-new-work').addEventListener('click', () => askWork());
+  $('#btn-word').addEventListener('click', () => $('#file-word').click());
+  $('#file-word').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    const doc = file && await readDocx(file);
+    if (doc) askWork({ title: file.name.replace(/\.docx$/i, '') }, doc, file.name);
   });
 
   // Menú «⋯» de cada trabajo: un solo popover que se coloca junto al botón que lo abre.
@@ -757,14 +790,8 @@
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    let doc;
-    try { doc = await PS_DOCX.read(await file.arrayBuffer()); } catch (err) {
-      console.error(err);
-      toast('No se pudo leer el archivo: debe ser un documento de Word (.docx).');
-      return;
-    }
-    const font = FONTS.find(([, label]) => label.toLowerCase() === (doc.font || '').toLowerCase());
-    await createProtocol(Number(e.target.dataset.year), cleanStored(doc.html), { ...(font && { font: font[0] }), ...(doc.size && { size: doc.size }) });
+    const doc = await readDocx(file);
+    if (doc) await createProtocol(Number(e.target.dataset.year), cleanStored(doc.html), docSettings(doc));
   });
 
   async function createProtocol(year, html, settings) {

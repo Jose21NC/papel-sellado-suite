@@ -97,6 +97,8 @@
       <div class="view-head">
         <h1>Mis trabajos</h1>
         <button class="btn primary" id="btn-new-work">+ Nuevo trabajo</button>
+        <button class="btn" id="btn-word" title="Convierte un documento de Word (.docx) en un trabajo, acomodado a los renglones del papel sellado">Subir Word</button>
+        <input type="file" id="file-word" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
         <button class="btn" id="btn-protocolo" title="Su protocolo del año: un solo documento que crece con cada escritura">Protocolo</button>
         <div class="spacer"></div>
         <div class="filters">
@@ -265,13 +267,14 @@
 
   <dialog id="dlg-work">
     <form method="dialog">
-      <h2>Nuevo trabajo</h2>
+      <h2 id="work-dlg-title">Nuevo trabajo</h2>
+      <p class="hint" id="work-dlg-hint" hidden></p>
       <label>Título <input type="text" name="title" required placeholder="Ej.: Testimonio escritura Nº 45 — Compraventa"></label>
       <label>Cliente / partes <input type="text" name="client"></label>
       <label>Tipo de papel
         <select name="kind"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select>
       </label>
-      <div class="buttons"><button class="btn primary" value="ok">Crear</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+      <div class="buttons"><button class="btn primary" value="ok" id="work-dlg-ok">Crear</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
     </form>
   </dialog>
 

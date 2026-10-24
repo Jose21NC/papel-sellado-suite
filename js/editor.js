@@ -177,6 +177,12 @@ const Editor = (() => {
       const space = prev && /\S$/.test(prev.textContent) && /^\S/.test(s.textContent);
       s.replaceWith(...(space ? [' '] : []), ...s.childNodes);
     };
+    // Dar formato a toda una línea de dos firmas envuelve las mitades (<b><span class="f2">…): el formato pasa adentro
+    // de cada mitad, para no juntar los dos nombres.
+    for (let w; (w = [...ed.querySelectorAll('p.firma b, p.firma i, p.firma u')].find((x) => x.querySelector(':scope > .f2')));) {
+      for (const s of w.querySelectorAll(':scope > .f2')) { const f = w.cloneNode(false); f.append(...s.childNodes); s.append(f); }
+      w.replaceWith(...w.childNodes);
+    }
     for (const s of ed.querySelectorAll('.f2')) if (!s.parentNode.matches('p.firma')) unwrap(s);
     for (const p of ed.querySelectorAll('p.firma')) {
       const halves = [...p.children].filter((c) => c.classList.contains('f2'));

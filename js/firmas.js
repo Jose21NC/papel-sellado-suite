@@ -49,8 +49,8 @@
       }));
     });
     return rows.map((sigs) => blank +
-      line(sigs.map((s) => (s.nombre ? esc(up(s.nombre)) : `<span class="campo">[NOMBRE${s.notario ? ' DEL NOTARIO' : ''}]</span>`))) +
-      (sigs.some((s) => s.cargo) ? line(sigs.map((s) => esc(up(s.cargo)))) : '')).join('');
+      line(sigs.map((s) => `<b>${s.nombre ? esc(up(s.nombre)) : `<span class="campo">[NOMBRE${s.notario ? ' DEL NOTARIO' : ''}]</span>`}</b>`)) +
+      (sigs.some((s) => s.cargo) ? line(sigs.map((s) => (s.cargo ? `<b>${esc(up(s.cargo))}</b>` : ''))) : '')).join('');
   }
 
   $('#firmas-rows').addEventListener('input', renderRows);
