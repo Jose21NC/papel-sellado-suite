@@ -84,6 +84,8 @@ const Profile = (() => {
       show();
     };
     $('#welcome-back').onclick = () => { step--; show(); };
+    // Enter en un dato es «Siguiente»: si no, enviaría el formulario con «Omitir» y se perdería lo escrito.
+    box.onkeydown = (e) => { if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); $('#welcome-next').click(); } };
     d.returnValue = '';
     d.showModal();
     show();
@@ -100,6 +102,8 @@ const Profile = (() => {
   });
 
   async function init() {
+    // Los avisos dicen dónde quedan los datos: en la cuenta o solo en este navegador.
+    for (const el of document.querySelectorAll('[data-con-cuenta], [data-sin-cuenta]')) el.hidden = el.hasAttribute('data-con-cuenta') !== !!Cloud.user();
     const [p, seen] = await Promise.all([DB.get('settings', 'profile'), DB.get('settings', 'welcome')]);
     if (p) profile = clean(p);
     if (!seen) welcome();

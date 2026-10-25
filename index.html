@@ -241,7 +241,7 @@
 
           <h3>Papel</h3>
           <p id="ed-count" class="muted" style="margin:0 0 8px"></p>
-          <button class="btn small" id="btn-autoassign" style="width:100%">Asignar papel disponible</button>
+          <button type="button" class="btn small" id="btn-autoassign" style="width:100%">Asignar papel disponible</button>
 
           <h3>Historial</h3>
           <ul class="log" id="ed-log"></ul>
@@ -265,7 +265,7 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-work">
+  <dialog id="dlg-work" aria-labelledby="work-dlg-title">
     <form method="dialog">
       <h2 id="work-dlg-title">Nuevo trabajo</h2>
       <p class="hint" id="work-dlg-hint" hidden></p>
@@ -278,7 +278,7 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-pick">
+  <dialog id="dlg-pick" aria-labelledby="pick-title">
     <form method="dialog">
       <h2 id="pick-title">Elegir papel sellado</h2>
       <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="pick-all"> Mostrar todos los tipos y valores</label>
@@ -287,9 +287,9 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-paper">
+  <dialog id="dlg-paper" aria-labelledby="paper-title">
     <form method="dialog">
-      <h2>Editar papel</h2>
+      <h2 id="paper-title">Editar papel</h2>
       <label>Tipo <select name="type"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select></label>
       <label>Valor (C$) <input type="number" name="value" min="0" step="1"></label>
       <label>Serie <input type="text" name="serie"></label>
@@ -344,7 +344,7 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-confirm">
+  <dialog id="dlg-confirm" aria-labelledby="confirm-title" aria-describedby="confirm-text">
     <form method="dialog">
       <h2 id="confirm-title">¿Confirmar?</h2>
       <p id="confirm-text" style="margin:0"></p>
@@ -359,7 +359,7 @@
   <dialog id="dlg-profile" aria-labelledby="profile-title">
     <form method="dialog">
       <h2 id="profile-title">Mis datos</h2>
-      <p class="hint">Se usan para llenar las plantillas automáticamente. Se guardan solo en este navegador y en sus respaldos.</p>
+      <p class="hint">Se usan para llenar las plantillas automáticamente. <span data-sin-cuenta>Se guardan solo en este navegador y en sus respaldos.</span><span data-con-cuenta hidden>Se guardan en su cuenta y en sus respaldos.</span></p>
       <div class="fields" id="profile-fields"></div>
       <button type="button" class="linklike" id="btn-welcome-again">Ver la introducción</button>
       <div class="buttons"><button class="btn primary" value="ok">Guardar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
@@ -372,7 +372,8 @@
         <span class="brand-mark big" aria-hidden="true"><svg><use href="#logo"/></svg></span>
         <h2 id="welcome-title" tabindex="-1">Le damos la bienvenida a Lexia</h2>
         <p>Escriba escrituras y testimonios directamente sobre el papel sellado digital de la DGI e imprímalos alineados con sus 30 renglones.</p>
-        <p class="hint">Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
+        <p class="hint" data-sin-cuenta>Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
+        <p class="hint" data-con-cuenta hidden>Sus trabajos, su protocolo y su papel sellado se guardan en su cuenta: los puede abrir en cualquier computadora.</p>
       </section>
       <section data-step="2" hidden>
         <h2 tabindex="-1">Cómo funciona</h2>
@@ -384,7 +385,7 @@
       </section>
       <section data-step="3" hidden>
         <h2 tabindex="-1">Sus datos (opcional)</h2>
-        <p class="hint">Con ellos las plantillas se llenan solas: nombre, domicilio, quinquenio, ciudad… Se guardan solo en este navegador. Puede completarlos o cambiarlos cuando quiera en «Mis datos».</p>
+        <p class="hint">Con ellos las plantillas se llenan solas: nombre, domicilio, quinquenio, ciudad… <span data-sin-cuenta>Se guardan solo en este navegador.</span><span data-con-cuenta hidden>Se guardan en su cuenta.</span> Puede completarlos o cambiarlos cuando quiera en «Mis datos».</p>
         <div class="fields" id="welcome-fields"></div>
       </section>
       <section data-step="4" hidden>
