@@ -5,6 +5,7 @@
   const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('es-NI', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   const now = () => new Date().toISOString();
+  const plural = (n, uno, varios = uno + 's') => `${n} ${n === 1 ? uno : varios}`;
 
   const FONTS = [
     ['"Times New Roman", Times, serif', 'Times New Roman'],
@@ -115,7 +116,7 @@
 
   function renderPerfil() {
     const u = Cloud.user(), st = Cloud.status;
-    $('#cuenta-info').textContent = u ? u.email : 'Esta copia de Lexia no tiene Firebase configurado: todo se guarda solo en este navegador.';
+    $('#cuenta-info').textContent = u ? u.email : 'Lexia funciona sin cuenta en esta copia: todo se guarda solo en este navegador. Exporte un respaldo de vez en cuando.';
     $('#cuenta-sync').textContent = !u ? '' : st.pending ? `${st.pending} cambio${st.pending === 1 ? '' : 's'} por subir a su cuenta.${st.error ? ' ' + st.error : ''}` : 'Todo está guardado en su cuenta.';
     $('#btn-logout').hidden = !u;
     const via = { pago: 'pago único', cupon: 'cupón', anterior: 'cuenta fundadora' }[licencia?.via];
@@ -142,6 +143,7 @@
       err.textContent = '';
     };
     mode();
+    f.email.focus();
     $('#auth-switch').onclick = () => { create = !create; mode(); };
     $('#auth-reset').onclick = async () => {
       if (!f.email.value.trim()) { err.textContent = 'Escriba su correo y vuelva a pulsar «¿Olvidó su contraseña?».'; return; }
@@ -181,7 +183,7 @@
     if ((await DB.all('works')).length || (await DB.all('papers')).length) return;
     const old = await DB.legacy();
     if (!old || !(old.works.length || old.papers.length)) return;
-    if (!(await confirmDialog('Datos en este navegador', `Este navegador tiene ${old.works.length} trabajos y ${old.papers.length} hojas de papel sellado guardados sin cuenta. ¿Pasarlos a su cuenta?`, 'Pasarlos a mi cuenta'))) return;
+    if (!(await confirmDialog('Datos en este navegador', `Este navegador tiene ${plural(old.works.length, 'trabajo')} y ${plural(old.papers.length, 'hoja')} de papel sellado guardados sin cuenta. ¿Pasarlos a su cuenta?`, 'Pasarlos a mi cuenta'))) return;
     for (const s of ['files', 'papers', 'works', 'settings']) await DB.putMany(s, old[s]);
     toast('Subiendo sus datos a su cuenta…');
   }
@@ -372,8 +374,11 @@
     const p = paperById(btn.closest('tr').dataset.id);
     if (!p) return;
     const act = btn.dataset.act;
+    // Un PDF que no se reconoció no tiene serie ni número: se nombra por su archivo.
+    const hoja = p.serie || p.numero ? `la hoja ${p.serie ? p.serie + ' ' : ''}Nº ${p.numero || '—'}` : `la hoja de «${p.fileName}»`;
     if (act === 'view') {
-      const blob = await fileBlob(p.fileId);
+      let blob;
+      try { blob = await fileBlob(p.fileId); } catch (err) { console.error(err); return toast('No se pudo bajar el PDF de su cuenta: revise su conexión.'); }
       if (!blob) return toast('No se encontró el PDF');
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
@@ -385,12 +390,12 @@
       await DB.put('papers', p);
       renderPapers();
     } else if (act === 'void') {
-      if (p.status !== 'anulado' && !(await confirmDialog('Anular papel', `La hoja ${p.serie || ''} Nº ${p.numero || ''} quedará marcada como anulada (inutilizada) y no se asignará a trabajos.`, 'Anular', true))) return;
+      if (p.status !== 'anulado' && !(await confirmDialog('Anular papel', `${cap(hoja)} quedará marcada como anulada (inutilizada) y no se asignará a trabajos.`, 'Anular', true))) return;
       p.status = p.status === 'anulado' ? 'disponible' : 'anulado';
       await DB.put('papers', p);
       renderPapers();
     } else if (act === 'delete') {
-      if (!(await confirmDialog('Eliminar papel', `Se borrará la hoja ${p.serie || ''} Nº ${p.numero || ''} de Lexia. El PDF original en su computadora no se toca.`, 'Eliminar', true))) return;
+      if (!(await confirmDialog('Eliminar papel', `Se borrará ${hoja} de Lexia. El PDF original en su computadora no se toca.`, 'Eliminar', true))) return;
       await DB.del('papers', p.id);
       state.papers = state.papers.filter((x) => x.id !== p.id);
       if (!state.papers.some((x) => x.fileId === p.fileId)) { await DB.del('files', p.fileId); state.files.delete(p.fileId); PDF.forget(p.fileId); }
@@ -404,6 +409,9 @@
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); uploadFiles(e.dataTransfer.files); });
+  // Un archivo soltado fuera de la zona no debe abrirse en la pestaña: se saldría de Lexia.
+  addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('Files') && !drop.contains(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
+  addEventListener('drop', (e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); });
   $('#btn-upload').addEventListener('click', () => $('#file-pdf').click());
   $('#file-pdf').addEventListener('change', (e) => { uploadFiles(e.target.files); e.target.value = ''; });
   for (const id of ['#papers-search', '#papers-type', '#papers-status']) $(id).addEventListener('input', renderPapers);
@@ -472,9 +480,10 @@
     if (doc) toast('Documento importado: revise el texto antes de imprimir.');
   }
 
-  // Tipo y tamaño de letra del Word, si la suite los tiene.
+  // Tipo y tamaño de letra del Word, si la suite los tiene (por su nombre o el de su familia: «Bookman Old Style»).
   function docSettings(doc) {
-    const font = FONTS.find(([, label]) => label.toLowerCase() === (doc.font || '').toLowerCase());
+    const name = (doc.font || '').toLowerCase();
+    const font = FONTS.find(([v, label]) => [label, ...v.split(',')].some((n) => n.trim().replace(/"/g, '').toLowerCase() === name));
     return { ...(font && { font: font[0] }), ...(doc.size && { size: doc.size }) };
   }
 
@@ -794,7 +803,9 @@
   // queda activo hasta el 31 de diciembre. Se empieza con el acta de apertura o subiendo el que se lleva en Word.
   const thisYear = () => new Date().getFullYear();
   const protocolOf = (year) => state.works.find((w) => w.protocolo === year) || null;
-  const escrituras = (w) => (plain(w).match(/escritura\s+p[úu]blica\s+n[úu]mero/g) || []).length;
+  // Cada escritura empieza un párrafo con «ESCRITURA PÚBLICA NÚMERO»; las citadas en el texto (antecedentes) no cuentan.
+  const ESCRITURA = /<p(?![^>]*data-cont)[^>]*>(?:\s|&nbsp;|<(?!\/?p[\s>])[^>]+>)*escritura(?:\s|&nbsp;)+p[úu]blica(?:\s|&nbsp;)+n[úu]mero/gi;
+  const escrituras = (w) => (w.pages.join('').match(ESCRITURA) || []).length;
 
   $('#btn-protocolo').addEventListener('click', async () => {
     const open = protocolOf(thisYear());
@@ -852,8 +863,8 @@
   // En Plantillas, el Nº de escritura sigue al protocolo del año.
   $('#btn-templates').addEventListener('click', () => {
     const p = protocolOf(thisYear());
-    if (!p || p === state.work && unsaved()) return;
-    $('#tpl-num').value = escrituras(p) + 1;
+    if (!p) return;
+    $('#tpl-num').value = escrituras(p === state.work ? { pages: Editor.pagesHtml() } : p) + 1; // en el protocolo abierto, con lo aún sin guardar
     $('#tpl-num').dispatchEvent(new Event('input'));
   });
 
@@ -899,6 +910,7 @@
         <label><input type="radio" name="pick" value="${esc(p.id)}" ${i === 0 ? 'checked' : ''}>
         <span><strong>${esc(cap(p.type))} C$${esc(p.value ?? '?')}</strong> · Serie ${esc(p.serie || '—')} Nº ${esc(p.numero || '—')}</span></label>`).join('')
         : '<div class="empty">No hay papel disponible de este tipo. Suba más PDF en “Papel sellado” o marque “Mostrar todos”.</div>';
+      d.querySelector('button[value=ok]').disabled = !list.length;
     };
     $('#pick-all').checked = false;
     $('#pick-all').onchange = render;
@@ -929,7 +941,8 @@
       }
     } finally { btn.disabled = false; }
     const missing = Array.from({ length: needed }, (_, s) => s).filter((s) => !w.paperIds[s]).length;
-    toast(missing ? `Se asignaron ${done} hojas. Faltan ${missing} hojas de ${w.kind}${value ? ' C$' + value : ''}.` : `Listo: ${done} hoja${done === 1 ? '' : 's'} asignada${done === 1 ? '' : 's'}.`);
+    toast(missing ? `${done ? `Se asignó papel a ${plural(done, 'hoja')}. ` : ''}No hay papel de ${w.kind}${value ? ' C$' + value : ''} disponible para ${missing === 1 ? 'la hoja que falta' : `las ${missing} hojas que faltan`}: suba más en «Papel sellado».`
+      : done ? `Listo: se asignó papel a ${plural(done, 'hoja')}.` : 'Todas las hojas ya tienen papel sellado.');
     Editor.relayout();
     updateCount();
   });
@@ -1046,19 +1059,27 @@
     if (unsaved()) await saveWork();
     if (state.work && unsaved()) state.work.pages = Editor.pagesHtml(); // aunque el guardado falle, el respaldo lleva el texto actual
     toast('Preparando respaldo…');
-    const files = await DB.all('files');
-    const out = {
-      app: 'papel-sellado-suite', version: 1, exportedAt: now(),
-      files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(await fileBlob(f.id)) }))),
-      papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app, profile: Profile.filled() ? Profile.get() : undefined,
-    };
+    let out;
+    try {
+      const files = await DB.all('files');
+      out = {
+        app: 'papel-sellado-suite', version: 1, exportedAt: now(),
+        files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(await fileBlob(f.id)) }))),
+        papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app, profile: Profile.filled() ? Profile.get() : undefined,
+      };
+    } catch (err) {
+      // Con cuenta, los PDF que aún no están en este navegador se bajan para el respaldo.
+      console.error(err);
+      toast(err.offline ? 'Sin conexión: no se pudieron bajar de su cuenta los PDF de papel sellado para el respaldo. Intente de nuevo con internet.' : 'No se pudo preparar el respaldo.');
+      return;
+    }
     const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `respaldo-lexia-${now().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    toast(`Respaldo descargado: ${out.works.length} trabajos, ${out.papers.length} hojas.`);
+    toast(`Respaldo descargado: ${plural(out.works.length, 'trabajo')}, ${plural(out.papers.length, 'hoja')}.`);
   });
 
   // El respaldo viene de un archivo: se valida y el HTML de los trabajos se limpia antes de guardarlo.
@@ -1090,7 +1111,7 @@
     let data;
     try { data = JSON.parse(await file.text()); } catch { toast('El archivo no es un respaldo válido'); return; }
     if (data?.app !== 'papel-sellado-suite' || !Array.isArray(data.works) || !Array.isArray(data.papers) || !Array.isArray(data.files)) { toast('El archivo no es un respaldo de Lexia'); return; }
-    if (!(await confirmDialog('Importar respaldo', `Se importarán ${data.works.length} trabajos y ${data.papers.length} hojas${data.profile ? ', y sus datos de «Mis datos»' : ''}. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
+    if (!(await confirmDialog('Importar respaldo', `Se importarán ${plural(data.works.length, 'trabajo')} y ${plural(data.papers.length, 'hoja')}${data.profile ? ', y sus datos de «Mis datos»' : ''}. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
     try {
       const files = [];
       for (const f of data.files) {
@@ -1141,7 +1162,7 @@
         return true;
       });
       if (fixed.length) await DB.putMany('works', fixed);
-      toast(`Respaldo importado: ${works.length} trabajos, ${papers.length} hojas.`);
+      toast(`Respaldo importado: ${plural(works.length, 'trabajo')}, ${plural(papers.length, 'hoja')}.`);
       route();
     } catch (err) {
       console.error(err);

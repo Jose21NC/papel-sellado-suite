@@ -56,5 +56,9 @@ test('campos: cómo se escribe cada dato', () => {
   assert.strictEqual(put('HORA EN LETRAS', '13:05'), 'la una y cinco minutos de la tarde');
   assert.strictEqual(put('NOMBRE DEL VENDEDOR', ' Ana Ruiz '), 'Ana Ruiz');
   assert.strictEqual(put('NÚMERO Y MONTO DE LAS CUOTAS', 'doce'), 'doce');
+  assert.strictEqual(put('PLAZO EN LETRAS', 'dos años'), 'dos años');
+  assert.strictEqual(put('PLAZO EN LETRAS', '24 meses'), 'veinticuatro meses');
+  assert.strictEqual(put('ÁREA EN LETRAS', '1,250.5 varas cuadradas'), 'mil doscientos cincuenta punto cinco varas cuadradas');
+  assert.strictEqual(put('TOMO', 'doce'), 'doce');
   assert.strictEqual(put('FECHA EN LETRAS', ''), '');
 });
