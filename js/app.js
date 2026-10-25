@@ -86,9 +86,18 @@
   }
 
   // ---------- navegación ----------
+  // Al llegar a una sección sus filas entran escalonadas (body.entering); al filtrar o cambiar un trabajo ya no.
+  let enterTimer = 0;
+  function entering() {
+    document.body.classList.add('entering');
+    clearTimeout(enterTimer);
+    enterTimer = setTimeout(() => document.body.classList.remove('entering'), 900);
+  }
+
   function route() {
     const [name, id] = location.hash.replace(/^#/, '').split('/');
     if (state.work && !(name === 'trabajo' && id === state.work.id)) flushSave();
+    entering();
     document.body.classList.toggle('editor-view', name === 'trabajo');
     $('#view-works').hidden = name !== 'trabajos' && name !== '';
     $('#view-papers').hidden = name !== 'papel';
@@ -762,6 +771,23 @@
   }
   $('#bg-mode').addEventListener('click', (e) => { const b = e.target.closest('[data-bg]'); if (b) setBg(b.dataset.bg); });
   try { setBg(localStorage.getItem('pss-bg') || ''); } catch { setBg(''); }
+
+  // Segmentos de una sola opción (.glide): el relieve se desliza hasta el botón activo. Se mide al cambiar el activo
+  // o el tamaño; la primera vez se coloca sin animar.
+  function glide(seg) {
+    const on = seg.querySelector(':scope > [aria-current="page"], :scope > [aria-pressed="true"]');
+    const first = !seg.classList.contains('ready');
+    if (on ? !on.offsetWidth : first) return; // oculto o sin activo todavía
+    seg.classList.toggle('instant', first);
+    seg.style.setProperty('--go', on ? 1 : 0);
+    if (on) { seg.style.setProperty('--gx', on.offsetLeft + 'px'); seg.style.setProperty('--gw', on.offsetWidth + 'px'); }
+    seg.classList.add('ready');
+    if (first) { getComputedStyle(seg, '::before').transform; seg.classList.remove('instant'); } // fija la posición antes de animar
+  }
+  for (const seg of document.querySelectorAll('.glide')) {
+    new MutationObserver(() => glide(seg)).observe(seg, { subtree: true, attributeFilter: ['aria-current', 'aria-pressed'] });
+    new ResizeObserver(() => glide(seg)).observe(seg);
+  }
 
   // ---------- protocolo ----------
   // El protocolo del año es un trabajo más (w.protocolo = año): un solo documento que crece con cada escritura y
