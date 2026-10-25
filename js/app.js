@@ -5,6 +5,7 @@
   const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('es-NI', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   const now = () => new Date().toISOString();
+  const plural = (n, uno, varios = uno + 's') => `${n} ${n === 1 ? uno : varios}`;
 
   const FONTS = [
     ['"Times New Roman", Times, serif', 'Times New Roman'],
@@ -17,7 +18,7 @@
     ['Cambria, Georgia, serif', 'Cambria'],
     ['Calibri, Carlito, sans-serif', 'Calibri'],
   ];
-  const DEFAULT_SETTINGS = { font: FONTS[0][0], size: 12, indent: 0, letterSpacing: 0, marginLeft: 0, marginRight: 0, gap: 3, dashes: true };
+  const DEFAULT_SETTINGS = { font: FONTS[0][0], size: 12, indent: 0, letterSpacing: 0, marginLeft: 0, marginRight: 0, gap: 3, dashes: true, hidePrinted: false };
 
   const state = { papers: [], works: [], files: new Map(), app: { id: 'app', printOffsetX: 0, printOffsetY: 0 }, work: null };
 
@@ -64,8 +65,18 @@
     state.app = (await DB.get('settings', 'app')) || state.app;
   }
 
+  // Con cuenta, un PDF que aún no está en este navegador se baja de la nube la primera vez que se usa.
   async function fileBlob(fileId) {
-    if (!state.files.has(fileId)) state.files.set(fileId, DB.get('files', fileId).then((f) => f?.blob));
+    if (!state.files.has(fileId)) {
+      const p = DB.get('files', fileId).then(async (f) => {
+        if (!f || f.blob || !Cloud.user()) return f?.blob;
+        const blob = await Cloud.fileBlob(fileId, f.chunks);
+        await DB.put('files', { ...f, blob }, true);
+        return blob;
+      });
+      p.catch(() => state.files.delete(fileId));
+      state.files.set(fileId, p);
+    }
     return state.files.get(fileId);
   }
 
@@ -76,21 +87,191 @@
   }
 
   // ---------- navegación ----------
+  // Al llegar a una sección sus filas entran escalonadas (body.entering); al filtrar o cambiar un trabajo ya no.
+  let enterTimer = 0;
+  function entering() {
+    document.body.classList.add('entering');
+    clearTimeout(enterTimer);
+    enterTimer = setTimeout(() => document.body.classList.remove('entering'), 900);
+  }
+
   function route() {
     const [name, id] = location.hash.replace(/^#/, '').split('/');
     if (state.work && !(name === 'trabajo' && id === state.work.id)) flushSave();
+    entering();
     document.body.classList.toggle('editor-view', name === 'trabajo');
     $('#view-works').hidden = name !== 'trabajos' && name !== '';
     $('#view-papers').hidden = name !== 'papel';
+    $('#view-perfil').hidden = name !== 'perfil';
     $('#view-editor').hidden = name !== 'trabajo';
     for (const t of document.querySelectorAll('.tab')) t.toggleAttribute('aria-current', false);
     const current = document.querySelector(`.tab[data-route="${name === 'trabajo' ? 'trabajos' : name || 'trabajos'}"]`);
     current?.setAttribute('aria-current', 'page');
     if (name === 'papel') renderPapers();
+    else if (name === 'perfil') renderPerfil();
     else if (name === 'trabajo') openWork(id);
     else renderWorks();
   }
   const go = (r) => { location.hash = r; };
+
+  function renderPerfil() {
+    const u = Cloud.user(), st = Cloud.status;
+    $('#cuenta-info').textContent = u ? u.email : 'Lexia funciona sin cuenta en esta copia: todo se guarda solo en este navegador. Exporte un respaldo de vez en cuando.';
+    $('#cuenta-sync').textContent = !u ? '' : st.pending ? `${st.pending} cambio${st.pending === 1 ? '' : 's'} por subir a su cuenta.${st.error ? ' ' + st.error : ''}` : 'Todo está guardado en su cuenta.';
+    $('#btn-logout').hidden = !u;
+    const via = { pago: 'pago único', cupon: 'cupón', anterior: 'cuenta fundadora' }[licencia?.via];
+    $('#cuenta-licencia').textContent = u && licencia?.estado === 'activa' ? `Lexia activa (${via}).` : '';
+    const p = Profile.get();
+    $('#perfil-resumen').textContent = p.nombre ? `${p.nombre}${p.titulo ? ' · ' + p.titulo : ''}` : 'Todavía no ha guardado sus datos.';
+  }
+  $('#dlg-profile').addEventListener('close', () => setTimeout(renderPerfil)); // Profile ya guardó lo nuevo
+  addEventListener('cloud-status', () => { if (!$('#view-perfil').hidden) renderPerfil(); });
+
+  // ---------- cuenta ----------
+  // Pantalla de entrada: se resuelve cuando hay sesión.
+  function login() {
+    document.body.classList.add('auth-view');
+    $('#auth').hidden = false;
+    const f = $('#auth-form'), err = $('#auth-error');
+    let create = false;
+    const mode = () => {
+      $('#auth-title').textContent = $('#auth-submit').textContent = create ? 'Crear cuenta' : 'Entrar';
+      $('#auth-switch').textContent = create ? '¿Ya tiene cuenta? Entrar' : '¿No tiene cuenta? Crear una';
+      $('#auth-confirm').hidden = !create;
+      $('#auth-reset').hidden = create;
+      f.password.autocomplete = create ? 'new-password' : 'current-password';
+      err.textContent = '';
+    };
+    mode();
+    f.email.focus();
+    $('#auth-switch').onclick = () => { create = !create; mode(); };
+    $('#auth-reset').onclick = async () => {
+      if (!f.email.value.trim()) { err.textContent = 'Escriba su correo y vuelva a pulsar «¿Olvidó su contraseña?».'; return; }
+      try { await Cloud.resetPassword(f.email.value.trim()); err.textContent = ''; toast('Le enviamos un correo para cambiar la contraseña.'); } catch (e) { err.textContent = e.message; }
+    };
+    return new Promise((resolve) => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = f.email.value.trim(), password = f.password.value;
+        if (!email || !password) { err.textContent = 'Escriba su correo y su contraseña.'; return; }
+        if (create && password !== f.confirm.value) { err.textContent = 'Las contraseñas no coinciden.'; return; }
+        $('#auth-submit').disabled = true;
+        try {
+          await Cloud.signIn(email, password, create);
+          f.reset();
+          $('#auth').hidden = true;
+          document.body.classList.remove('auth-view');
+          resolve();
+        } catch (e2) { err.textContent = e2.message; } finally { $('#auth-submit').disabled = false; }
+      };
+    });
+  }
+
+  // Abre la copia local de la cuenta, sube lo pendiente y trae lo de la nube. Sin conexión sigue con lo local.
+  async function openAccount() {
+    DB.use(Cloud.user().uid);
+    await Cloud.start();
+    try {
+      await Cloud.flush();
+      await Cloud.pull();
+    } catch (err) {
+      if (err.code) { Cloud.signOut(); await login(); return openAccount(); } // la sesión ya no vale
+      toast(err.offline ? 'Sin conexión con su cuenta: se muestra lo guardado en este navegador.' : `No se pudo abrir su cuenta (${err.message}). Se muestra lo guardado en este navegador.`);
+      return;
+    }
+    // La primera vez, lo que ya había en este navegador (sin cuenta) se puede pasar a la cuenta.
+    if ((await DB.all('works')).length || (await DB.all('papers')).length) return;
+    const old = await DB.legacy();
+    if (!old || !(old.works.length || old.papers.length)) return;
+    if (!(await confirmDialog('Datos en este navegador', `Este navegador tiene ${plural(old.works.length, 'trabajo')} y ${plural(old.papers.length, 'hoja')} de papel sellado guardados sin cuenta. ¿Pasarlos a su cuenta?`, 'Pasarlos a mi cuenta'))) return;
+    for (const s of ['files', 'papers', 'works', 'settings']) await DB.putMany(s, old[s]);
+    toast('Subiendo sus datos a su cuenta…');
+  }
+
+  // ---------- muro de pago ----------
+  // Un solo pago de C$ 800 por cuenta (enlace de Poket) o un cupón. El acceso es inmediato al escribir el comprobante:
+  // el administrador lo revisa en Poket y, si no aparece, cambia la licencia a «desactivada» desde la consola.
+  // Las cuentas creadas antes del muro no pagan.
+  const CUPONES = ['BOREALABS']; // exentan del 100 %; el mismo código está en firebase/firestore.rules
+  const MURO_DESDE = Date.parse('2026-10-23T01:00:00Z');
+  const PRECIO = 800;
+  let licencia = null; // { estado, via } para mostrarla en Perfil
+  const licKey = () => `lexia-licencia-${Cloud.user().uid}`;
+
+  async function paywall() {
+    try {
+      licencia = await Cloud.license() || ((await Cloud.createdAt()) < MURO_DESDE ? { estado: 'activa', via: 'anterior' } : null);
+      try { localStorage.setItem(licKey(), JSON.stringify(licencia)); } catch {}
+    } catch (err) {
+      console.error(err);
+      try { licencia = JSON.parse(localStorage.getItem(licKey())); } catch {} // sin conexión: lo último que se supo
+    }
+    if (licencia?.estado === 'activa') return;
+    await showPaywall();
+  }
+
+  function showPaywall() {
+    document.body.classList.add('auth-view');
+    $('#paywall').hidden = false;
+    const f = $('#pay-form'), err = $('#pay-error');
+    const busy = (on) => { for (const b of f.querySelectorAll('button')) b.disabled = on; };
+    $('#pay-email').textContent = `Cuenta: ${Cloud.user().email}.`;
+    // Una licencia desactivada no se puede volver a crear: solo el administrador la reactiva.
+    const off = !!licencia;
+    for (const el of f.querySelectorAll('.price, .pay-link, label, #pay-submit, .coupon')) el.hidden = off;
+    $('#pay-sub').textContent = off ? 'Su pago no se pudo verificar con Poket y Lexia quedó desactivada en esta cuenta. Si ya pagó, envíe su comprobante a soporte para reactivarla.'
+      : 'Un solo pago, sin mensualidades. Lexia queda activa para siempre en su cuenta.';
+    $('#pay-logout').onclick = async () => { Cloud.signOut(); await DB.drop(); location.reload(); };
+    return new Promise((resolve) => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        err.textContent = '';
+        // Enter en el cupón también lo aplica (el botón por omisión del formulario es «Ya pagué»).
+        const viaCupon = e.submitter?.value === 'cupon' || document.activeElement === f.cupon;
+        let data;
+        if (viaCupon) {
+          const code = f.cupon.value.trim().toUpperCase();
+          if (!CUPONES.includes(code)) { err.textContent = 'Ese cupón no es válido.'; return; }
+          data = { via: 'cupon', cupon: code };
+        } else {
+          const ref = f.comprobante.value.trim();
+          if (!/^[A-Za-z0-9-]{4,40}$/.test(ref)) { err.textContent = 'Escriba el número de comprobante que le dio Poket al terminar el pago.'; return; }
+          data = { via: 'pago', comprobante: ref, monto: PRECIO };
+        }
+        busy(true);
+        try {
+          await Cloud.createLicense({ ...data, estado: 'activa', email: Cloud.user().email, fecha: now() });
+          licencia = { estado: 'activa', via: data.via };
+        } catch (e2) {
+          // Ya existía (p. ej. se activó en otra computadora): vale la que está guardada.
+          if (e2.status === 409) licencia = await Cloud.license().catch(() => null);
+          if (licencia?.estado !== 'activa') {
+            err.textContent = e2.offline ? 'Sin conexión: revise su internet e intente de nuevo.' : `No se pudo activar Lexia. Intente de nuevo en un momento. (${e2.message})`;
+            busy(false);
+            return;
+          }
+        }
+        try { localStorage.setItem(licKey(), JSON.stringify(licencia)); } catch {}
+        f.reset();
+        busy(false);
+        $('#paywall').hidden = true;
+        document.body.classList.remove('auth-view');
+        toast(data.via === 'cupon' ? 'Cupón aplicado: Lexia está activa en su cuenta.' : '¡Gracias! Lexia está activa en su cuenta.');
+        resolve();
+      };
+    });
+  }
+
+  $('#btn-logout').addEventListener('click', async () => {
+    await Cloud.flush();
+    const n = Cloud.status.pending;
+    const text = n ? `Hay ${n} cambio${n === 1 ? '' : 's'} sin subir a su cuenta que se perderán. Revise su conexión antes de salir.`
+      : 'Se borra la copia de sus datos en este navegador; siguen guardados en su cuenta.';
+    if (!(await confirmDialog('Cerrar sesión', text, 'Cerrar sesión', !!n))) return;
+    Cloud.signOut();
+    await DB.drop();
+    location.reload();
+  });
   document.addEventListener('click', (e) => {
     const r = e.target.closest('[data-route]');
     if (r) go(r.dataset.route);
@@ -193,8 +374,11 @@
     const p = paperById(btn.closest('tr').dataset.id);
     if (!p) return;
     const act = btn.dataset.act;
+    // Un PDF que no se reconoció no tiene serie ni número: se nombra por su archivo.
+    const hoja = p.serie || p.numero ? `la hoja ${p.serie ? p.serie + ' ' : ''}Nº ${p.numero || '—'}` : `la hoja de «${p.fileName}»`;
     if (act === 'view') {
-      const blob = await fileBlob(p.fileId);
+      let blob;
+      try { blob = await fileBlob(p.fileId); } catch (err) { console.error(err); return toast('No se pudo bajar el PDF de su cuenta: revise su conexión.'); }
       if (!blob) return toast('No se encontró el PDF');
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
@@ -206,12 +390,12 @@
       await DB.put('papers', p);
       renderPapers();
     } else if (act === 'void') {
-      if (p.status !== 'anulado' && !(await confirmDialog('Anular papel', `La hoja ${p.serie || ''} Nº ${p.numero || ''} quedará marcada como anulada (inutilizada) y no se asignará a trabajos.`, 'Anular', true))) return;
+      if (p.status !== 'anulado' && !(await confirmDialog('Anular papel', `${cap(hoja)} quedará marcada como anulada (inutilizada) y no se asignará a trabajos.`, 'Anular', true))) return;
       p.status = p.status === 'anulado' ? 'disponible' : 'anulado';
       await DB.put('papers', p);
       renderPapers();
     } else if (act === 'delete') {
-      if (!(await confirmDialog('Eliminar papel', `Se borrará la hoja ${p.serie || ''} Nº ${p.numero || ''} de la suite. El PDF original en su computadora no se toca.`, 'Eliminar', true))) return;
+      if (!(await confirmDialog('Eliminar papel', `Se borrará ${hoja} de Lexia. El PDF original en su computadora no se toca.`, 'Eliminar', true))) return;
       await DB.del('papers', p.id);
       state.papers = state.papers.filter((x) => x.id !== p.id);
       if (!state.papers.some((x) => x.fileId === p.fileId)) { await DB.del('files', p.fileId); state.files.delete(p.fileId); PDF.forget(p.fileId); }
@@ -225,6 +409,9 @@
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); uploadFiles(e.dataTransfer.files); });
+  // Un archivo soltado fuera de la zona no debe abrirse en la pestaña: se saldría de Lexia.
+  addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('Files') && !drop.contains(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
+  addEventListener('drop', (e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); });
   $('#btn-upload').addEventListener('click', () => $('#file-pdf').click());
   $('#file-pdf').addEventListener('change', (e) => { uploadFiles(e.target.files); e.target.value = ''; });
   for (const id of ['#papers-search', '#papers-type', '#papers-status']) $(id).addEventListener('input', renderPapers);
@@ -249,17 +436,16 @@
         const assigned = w.paperIds.filter(Boolean).length;
         const last = w.printLog[w.printLog.length - 1];
         return `<tr data-id="${esc(w.id)}">
-          <td><a href="#trabajo/${esc(w.id)}"><strong>${esc(w.title)}</strong></a></td>
-          <td>${esc(w.client || '—')}</td>
+          <td><a href="#trabajo/${esc(w.id)}">${LABELS.includes(w.label) ? `<span class="tag ${w.label}" title="Etiqueta ${w.label}"></span>` : ''}<strong>${esc(w.title)}</strong></a>${w.protocolo ? `<div class="muted">${escrituras(w)} escritura${escrituras(w) === 1 ? '' : 's'}</div>` : ''}</td>
+          <td>${w.protocolo ? '' : esc(w.client || '—')}</td>
           <td><span class="pill ${esc(w.kind)}">${esc(cap(w.kind))}${w.paperValue ? ' C$' + esc(w.paperValue) : ''}</span></td>
           <td>${sheets} <span class="muted">(${assigned} con papel)</span></td>
-          <td><span class="pill ${esc(w.status)}">${esc(cap(w.status))}</span></td>
+          <td>${w.protocolo ? (w.protocolo >= thisYear() ? '<span class="pill impreso" title="Se cierra el 31 de diciembre">Activo</span>' : '<span class="pill">Cerrado</span>') : `<span class="pill ${esc(w.status)}">${esc(cap(w.status))}</span>`}</td>
           <td class="muted">${w.printLog.length ? `${w.printLog.length} · ${esc(fmtDate(last.at))}` : '—'}</td>
           <td class="muted">${esc(fmtDate(w.updatedAt))}</td>
           <td class="actions">
             <button class="btn small" data-act="open">Abrir</button>
-            <button class="btn small" data-act="dup">Duplicar</button>
-            <button class="btn small danger" data-act="delete">Eliminar</button>
+            <button class="btn small more" data-act="menu" popovertarget="work-menu" aria-label="Más acciones" title="Más acciones"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="13" cy="8" r="1.2"/></svg></button>
           </td></tr>`;
       }).join('')}</tbody></table>`;
   }
@@ -273,25 +459,87 @@
     };
   }
 
-  $('#btn-new-work').addEventListener('click', async () => {
-    const f = $('#dlg-work').querySelector('form');
-    f.reset();
-    const v = await formDialog($('#dlg-work'));
+  // Nuevo trabajo, en blanco o desde un Word (con su texto y su letra); el diálogo pide nombre, partes y papel.
+  async function askWork(fields = {}, doc = null, fileName = '') {
+    const d = $('#dlg-work');
+    d.querySelector('form').reset();
+    $('#work-dlg-title').textContent = doc ? 'Importar documento de Word' : 'Nuevo trabajo';
+    $('#work-dlg-ok').textContent = doc ? 'Importar' : 'Crear';
+    $('#work-dlg-hint').hidden = !doc;
+    if (doc) $('#work-dlg-hint').textContent = `«${fileName}» se acomoda en los renglones del papel sellado, con su negrita, cursiva, subrayado y alineación. Confirme el nombre y las partes.`;
+    const v = await formDialog(d, fields);
     if (!v) return;
     const w = newWork(v);
+    if (doc) {
+      w.pages = [cleanStored(doc.html) || '<p><br></p>'];
+      Object.assign(w.settings, docSettings(doc));
+    }
     await DB.put('works', w);
     state.works.push(w);
     go('trabajo/' + w.id);
+    if (doc) toast('Documento importado: revise el texto antes de imprimir.');
+  }
+
+  // Tipo y tamaño de letra del Word, si la suite los tiene (por su nombre o el de su familia: «Bookman Old Style»).
+  function docSettings(doc) {
+    const name = (doc.font || '').toLowerCase();
+    const font = FONTS.find(([v, label]) => [label, ...v.split(',')].some((n) => n.trim().replace(/"/g, '').toLowerCase() === name));
+    return { ...(font && { font: font[0] }), ...(doc.size && { size: doc.size }) };
+  }
+
+  async function readDocx(file) {
+    try { return await PS_DOCX.read(await file.arrayBuffer()); } catch (err) {
+      console.error(err);
+      toast('No se pudo leer el archivo: debe ser un documento de Word (.docx).');
+      return null;
+    }
+  }
+
+  $('#btn-new-work').addEventListener('click', () => askWork());
+  $('#btn-word').addEventListener('click', () => $('#file-word').click());
+  $('#file-word').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    const doc = file && await readDocx(file);
+    if (doc) askWork({ title: file.name.replace(/\.docx$/i, '') }, doc, file.name);
   });
 
-  $('#works-table').addEventListener('click', async (e) => {
+  // Menú «⋯» de cada trabajo: un solo popover que se coloca junto al botón que lo abre.
+  const LABELS = ['rojo', 'naranja', 'amarillo', 'verde', 'azul'];
+  const menu = $('#work-menu');
+  let menuWork = null, pendingCopy = null;
+  $('#works-table').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const w = workById(btn.closest('tr').dataset.id);
+    const w = btn && workById(btn.closest('tr').dataset.id);
     if (!w) return;
     if (btn.dataset.act === 'open') go('trabajo/' + w.id);
-    else if (btn.dataset.act === 'dup') {
-      const copy = { ...newWork(w), title: w.title + ' (copia)', client: w.client, kind: w.kind, paperValue: w.paperValue, notes: w.notes, settings: { ...w.settings }, pages: [...w.pages] };
+    else { menuWork = w; menu.anchorButton = btn; }
+  });
+  menu.addEventListener('beforetoggle', (e) => {
+    if (e.newState !== 'open') return;
+    for (const b of menu.querySelectorAll('[data-label]')) b.setAttribute('aria-pressed', b.dataset.label === (menuWork.label || ''));
+    menu.querySelector('[data-act=protocol]').hidden = !!menuWork.protocolo;
+    // Alineado a la derecha del botón; hacia arriba si no cabe debajo.
+    const r = menu.anchorButton.getBoundingClientRect();
+    const up = r.bottom > innerHeight - 260;
+    Object.assign(menu.style, { right: innerWidth - r.right + 'px', top: up ? 'auto' : r.bottom + 4 + 'px', bottom: up ? innerHeight - r.top + 4 + 'px' : 'auto' });
+  });
+  menu.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    const w = menuWork;
+    if (!btn || !w) return;
+    menu.hidePopover();
+    if ('label' in btn.dataset) {
+      w.label = btn.dataset.label || undefined;
+      await DB.put('works', w);
+      renderWorks();
+    } else if (btn.dataset.act === 'protocol') {
+      addToProtocol(w);
+    } else if (btn.dataset.act === 'copy') {
+      pendingCopy = w.id;
+      go('trabajo/' + w.id);
+    } else if (btn.dataset.act === 'dup') {
+      const copy = { ...newWork(w), title: w.title + ' (copia)', client: w.client, kind: w.kind, paperValue: w.paperValue, notes: w.notes, label: w.label, settings: { ...w.settings }, pages: [...w.pages] };
       await DB.put('works', copy);
       state.works.push(copy);
       toast('Trabajo duplicado (sin papel asignado)');
@@ -339,11 +587,31 @@
       sheetAction,
     });
     updateCount();
+    syncHide();
     setStatus('Guardado');
+    if (pendingCopy === id) { pendingCopy = null; document.fonts.ready.then(() => setTimeout(() => print('texto', true), 100)); }
   }
+
+  // «Ocultar lo impreso» solo tiene sentido después de anotar una impresión.
+  function syncHide() {
+    const b = $('#btn-hide-printed');
+    b.disabled = !(state.work.printedChars > 0);
+    b.setAttribute('aria-pressed', !b.disabled && state.work.settings.hidePrinted);
+  }
+  $('#btn-hide-printed').addEventListener('click', () => {
+    const s = state.work.settings;
+    s.hidePrinted = !s.hidePrinted;
+    syncHide();
+    Editor.refreshPrinted();
+    saveMeta(() => {});
+    toast(s.hidePrinted ? 'Lo ya impreso se ve gris y no se imprimirá: solo saldrá el texto nuevo.' : 'Se imprimirá todo el texto.');
+  });
 
   function fillSide() {
     const w = state.work;
+    // El protocolo no tiene cliente, tipo, estado ni notas: solo sus ajustes de papel, texto e impresión.
+    $('#ed-work-fields').hidden = !!w.protocolo;
+    $('#btn-datos').textContent = $('#datos-title').textContent = w.protocolo ? 'Ajustes' : 'Datos del trabajo';
     $('#ed-title').value = w.title;
     $('#ed-client').value = w.client;
     $('#ed-kind').value = w.kind;
@@ -433,7 +701,12 @@
   $('#ed-title').addEventListener('input', (e) => saveMeta((w) => { w.title = e.target.value.trim() || 'Sin título'; }));
   $('#ed-client').addEventListener('input', (e) => saveMeta((w) => { w.client = e.target.value.trim(); }));
   $('#ed-notes').addEventListener('input', (e) => saveMeta((w) => { w.notes = e.target.value; }));
-  $('#ed-state').addEventListener('change', (e) => saveMeta((w) => { w.status = e.target.value; }));
+  // Al terminar una escritura se ofrece agregarla al protocolo del año.
+  $('#ed-state').addEventListener('change', async (e) => {
+    const w = state.work;
+    await saveMeta(() => { w.status = e.target.value; });
+    if (w.status === 'finalizado' && !w.protocolo && !w.protocoloAt && protocolOf(thisYear())) addToProtocol(w);
+  });
   $('#ed-kind').addEventListener('change', (e) => saveMeta((w) => { w.kind = e.target.value; w.paperValue = null; }).then(fillValues));
   $('#ed-value').addEventListener('change', (e) => saveMeta((w) => { w.paperValue = e.target.value === '' ? null : Number(e.target.value); }));
 
@@ -476,6 +749,28 @@
 
   $('#btn-datos').addEventListener('click', () => $('#dlg-datos').showModal());
 
+  // Modo claro (por omisión) u oscuro; se recuerda en este navegador. El cambio se abre en círculo desde el botón.
+  const root = document.documentElement;
+  function syncTheme() {
+    const dark = root.dataset.theme === 'dark';
+    $('#btn-theme').setAttribute('aria-label', dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    $('#btn-theme').title = dark ? 'Modo claro' : 'Modo oscuro';
+  }
+  $('#btn-theme').addEventListener('click', (e) => {
+    const dark = root.dataset.theme !== 'dark';
+    const apply = () => { if (dark) root.dataset.theme = 'dark'; else delete root.dataset.theme; syncTheme(); };
+    try { localStorage.setItem('lexia-theme', dark ? 'dark' : 'light'); } catch {}
+    if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { apply(); return; }
+    const r = e.currentTarget.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const end = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    root.classList.add('theme-switch');
+    const t = document.startViewTransition(apply);
+    t.ready.then(() => root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${end}px at ${x}px ${y}px)`] },
+      { duration: 550, easing: 'cubic-bezier(.22,1,.36,1)', pseudoElement: '::view-transition-new(root)' }));
+    t.finished.finally(() => root.classList.remove('theme-switch'));
+  });
+  syncTheme();
+
   // Fondo en pantalla: normal, atenuado u oculto (la impresión no cambia). Se recuerda en este navegador.
   function setBg(mode) {
     document.body.classList.remove('bg-dim', 'bg-off');
@@ -485,6 +780,93 @@
   }
   $('#bg-mode').addEventListener('click', (e) => { const b = e.target.closest('[data-bg]'); if (b) setBg(b.dataset.bg); });
   try { setBg(localStorage.getItem('pss-bg') || ''); } catch { setBg(''); }
+
+  // Segmentos de una sola opción (.glide): el relieve se desliza hasta el botón activo. Se mide al cambiar el activo
+  // o el tamaño; la primera vez se coloca sin animar.
+  function glide(seg) {
+    const on = seg.querySelector(':scope > [aria-current="page"], :scope > [aria-pressed="true"]');
+    const first = !seg.classList.contains('ready');
+    if (on ? !on.offsetWidth : first) return; // oculto o sin activo todavía
+    seg.classList.toggle('instant', first);
+    seg.style.setProperty('--go', on ? 1 : 0);
+    if (on) { seg.style.setProperty('--gx', on.offsetLeft + 'px'); seg.style.setProperty('--gw', on.offsetWidth + 'px'); }
+    seg.classList.add('ready');
+    if (first) { getComputedStyle(seg, '::before').transform; seg.classList.remove('instant'); } // fija la posición antes de animar
+  }
+  for (const seg of document.querySelectorAll('.glide')) {
+    new MutationObserver(() => glide(seg)).observe(seg, { subtree: true, attributeFilter: ['aria-current', 'aria-pressed'] });
+    new ResizeObserver(() => glide(seg)).observe(seg);
+  }
+
+  // ---------- protocolo ----------
+  // El protocolo del año es un trabajo más (w.protocolo = año): un solo documento que crece con cada escritura y
+  // queda activo hasta el 31 de diciembre. Se empieza con el acta de apertura o subiendo el que se lleva en Word.
+  const thisYear = () => new Date().getFullYear();
+  const protocolOf = (year) => state.works.find((w) => w.protocolo === year) || null;
+  // Cada escritura empieza un párrafo con «ESCRITURA PÚBLICA NÚMERO»; las citadas en el texto (antecedentes) no cuentan.
+  const ESCRITURA = /<p(?![^>]*data-cont)[^>]*>(?:\s|&nbsp;|<(?!\/?p[\s>])[^>]+>)*escritura(?:\s|&nbsp;)+p[úu]blica(?:\s|&nbsp;)+n[úu]mero/gi;
+  const escrituras = (w) => (w.pages.join('').match(ESCRITURA) || []).length;
+
+  $('#btn-protocolo').addEventListener('click', async () => {
+    const open = protocolOf(thisYear());
+    if (open) { go('trabajo/' + open.id); return; }
+    const d = $('#dlg-protocolo');
+    $('#protocolo-anio').value = thisYear();
+    d.returnValue = '';
+    d.showModal();
+    const how = await new Promise((r) => d.addEventListener('close', () => r(d.returnValue), { once: true }));
+    const year = Math.round(Number($('#protocolo-anio').value)) || thisYear();
+    if (how === 'docx') { $('#file-docx').dataset.year = year; $('#file-docx').click(); }
+    else if (how === 'nuevo') {
+      const apertura = PLANTILLAS.find((t) => t.id === 'apertura-protocolo');
+      await createProtocol(year, PS_TEMPLATES.build(apertura, { ...Profile.get(), protocoloAnio: String(year) }, new Date(), ''));
+    }
+  });
+
+  $('#file-docx').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const doc = await readDocx(file);
+    if (doc) await createProtocol(Number(e.target.dataset.year), cleanStored(doc.html), docSettings(doc));
+  });
+
+  async function createProtocol(year, html, settings) {
+    if (protocolOf(year)) { toast(`Ya existe el protocolo ${year}.`); return; }
+    const w = newWork({ title: `Protocolo ${year}`, kind: 'protocolo' });
+    Object.assign(w, { protocolo: year, pages: [html || '<p><br></p>'] });
+    Object.assign(w.settings, settings);
+    await DB.put('works', w);
+    state.works.push(w);
+    go('trabajo/' + w.id);
+    toast(`Protocolo ${year}: ${escrituras(w)} escritura${escrituras(w) === 1 ? '' : 's'}. Agregue cada escritura terminada desde su menú «⋯» o al marcarla «Finalizado».`);
+  }
+
+  // Agrega el texto de un trabajo al final del protocolo del año (los párrafos partidos entre páginas se juntan).
+  async function addToProtocol(w) {
+    const p = protocolOf(thisYear());
+    if (!p) { toast(`Primero cree o suba su protocolo ${thisYear()} con el botón «Protocolo» de Mis trabajos.`); return; }
+    if (state.work === w) await saveWork();
+    const n = escrituras(p), pending = w.pages.join('').split('class="campo"').length - 1;
+    const text = [`«${w.title}» se agregará al final del protocolo ${p.protocolo}, que tiene ${n} escritura${n === 1 ? '' : 's'}.`,
+      pending && `Tiene ${pending} campo${pending === 1 ? '' : 's'} sin completar.`, w.protocoloAt && `Ya se agregó el ${fmtDate(w.protocoloAt)}.`].filter(Boolean).join(' ');
+    if (!(await confirmDialog('Agregar al protocolo', text, 'Agregar'))) return;
+    const html = Editor.joinPages(w.pages);
+    p.pages = plain(p).trim() ? [...p.pages.slice(0, -1), p.pages[p.pages.length - 1] + html] : [html];
+    p.updatedAt = w.protocoloAt = now();
+    delete p._plain;
+    await DB.putMany('works', [p, w]);
+    toast(`Agregado al protocolo ${p.protocolo}: ahora tiene ${escrituras(p)} escritura${escrituras(p) === 1 ? '' : 's'}.`);
+    if (!$('#view-works').hidden) renderWorks();
+  }
+
+  // En Plantillas, el Nº de escritura sigue al protocolo del año.
+  $('#btn-templates').addEventListener('click', () => {
+    const p = protocolOf(thisYear());
+    if (!p) return;
+    $('#tpl-num').value = escrituras(p === state.work ? { pages: Editor.pagesHtml() } : p) + 1; // en el protocolo abierto, con lo aún sin guardar
+    $('#tpl-num').dispatchEvent(new Event('input'));
+  });
 
   // ---------- asignación de papel ----------
   const matches = (w, p) => p.type === w.kind && (w.paperValue == null || p.value === w.paperValue);
@@ -528,6 +910,7 @@
         <label><input type="radio" name="pick" value="${esc(p.id)}" ${i === 0 ? 'checked' : ''}>
         <span><strong>${esc(cap(p.type))} C$${esc(p.value ?? '?')}</strong> · Serie ${esc(p.serie || '—')} Nº ${esc(p.numero || '—')}</span></label>`).join('')
         : '<div class="empty">No hay papel disponible de este tipo. Suba más PDF en “Papel sellado” o marque “Mostrar todos”.</div>';
+      d.querySelector('button[value=ok]').disabled = !list.length;
     };
     $('#pick-all').checked = false;
     $('#pick-all').onchange = render;
@@ -558,7 +941,8 @@
       }
     } finally { btn.disabled = false; }
     const missing = Array.from({ length: needed }, (_, s) => s).filter((s) => !w.paperIds[s]).length;
-    toast(missing ? `Se asignaron ${done} hojas. Faltan ${missing} hojas de ${w.kind}${value ? ' C$' + value : ''}.` : `Listo: ${done} hoja${done === 1 ? '' : 's'} asignada${done === 1 ? '' : 's'}.`);
+    toast(missing ? `${done ? `Se asignó papel a ${plural(done, 'hoja')}. ` : ''}No hay papel de ${w.kind}${value ? ' C$' + value : ''} disponible para ${missing === 1 ? 'la hoja que falta' : `las ${missing} hojas que faltan`}: suba más en «Papel sellado».`
+      : done ? `Listo: se asignó papel a ${plural(done, 'hoja')}.` : 'Todas las hojas ya tienen papel sellado.');
     Editor.relayout();
     updateCount();
   });
@@ -566,18 +950,24 @@
   // ---------- impresión ----------
   let printing = null; // impresión en curso: evita dobles clics y se registra al cerrar el diálogo
 
-  async function print(mode) {
+  // Caras que salen en el modo dado (con papel, solo las que tienen papel asignado); 0 si no se sigue.
+  async function facesFor(mode) {
+    const pages = Editor.pageCount();
+    if (mode !== 'fondo') return pages;
+    const withPaper = Array.from({ length: pages }, (_, i) => Editor.paperForPage(i)?.pages[i % 2]).filter(Boolean).length;
+    if (!withPaper) { toast('Asigne papel sellado a las hojas para imprimir con el papel de fondo.'); return 0; }
+    if (withPaper < pages && !(await confirmDialog('Hay hojas sin papel', `${pages - withPaper} de ${pages} caras no tienen papel sellado asignado y quedarán fuera. ¿Seguir con las demás?`, 'Seguir'))) return 0;
+    return withPaper;
+  }
+
+  // copy: copia completa (todo el texto, sin corrimiento de impresora) que no se anota en el historial.
+  async function print(mode, copy = false) {
     if (printing) return;
     const w = state.work;
-    const pages = Editor.pageCount();
-    let printed = pages;
-    if (mode === 'fondo') {
-      const withPaper = Array.from({ length: pages }, (_, i) => Editor.paperForPage(i)?.pages[i % 2]).filter(Boolean).length;
-      if (!withPaper) { toast('Asigne papel sellado a las hojas para imprimir con el papel de fondo.'); return; }
-      if (withPaper < pages && !(await confirmDialog('Hay hojas sin papel', `${pages - withPaper} de ${pages} caras no tienen papel sellado asignado y no se imprimirán. ¿Imprimir las demás?`, 'Imprimir'))) return;
-      printed = withPaper;
-    }
-    printing = { w, mode, pages: printed };
+    const printed = await facesFor(mode);
+    if (!printed) return;
+    printing = { w, mode, pages: printed, copy, chars: Editor.printedUpTo(mode) };
+    if (copy) Editor.refreshPrinted(true);
     for (const b of document.querySelectorAll('#btn-print-fondo, #btn-print-texto')) b.disabled = true;
     await saveWork();
     setStatus('Preparando impresión…');
@@ -590,13 +980,14 @@
       return;
     }
     document.body.dataset.print = mode;
-    document.body.style.setProperty('--print-ox', state.app.printOffsetX + 'mm');
-    document.body.style.setProperty('--print-oy', state.app.printOffsetY + 'mm');
+    document.body.style.setProperty('--print-ox', (copy ? 0 : state.app.printOffsetX) + 'mm');
+    document.body.style.setProperty('--print-oy', (copy ? 0 : state.app.printOffsetY) + 'mm');
     setStatus('Guardado');
     setTimeout(() => window.print(), 50);
   }
 
   function endPrint() {
+    if (printing?.copy) Editor.refreshPrinted();
     printing = null;
     delete document.body.dataset.print;
     for (const b of document.querySelectorAll('#btn-print-fondo, #btn-print-texto')) b.disabled = false;
@@ -607,15 +998,20 @@
   window.addEventListener('afterprint', async () => {
     const job = printing;
     endPrint();
-    if (!job) return;
-    if (!(await confirmDialog('¿Se imprimió?', 'Confirme si el documento se imprimió, para anotarlo en el historial del trabajo.', 'Sí, se imprimió'))) return;
+    if (!job || job.copy) return;
+    if (await confirmDialog('¿Se imprimió?', 'Confirme si el documento se imprimió, para anotarlo en el historial del trabajo.', 'Sí, se imprimió')) await recordPrint(job);
+  });
+
+  // Anota una impresión: historial, estado y hasta dónde quedó impreso el texto (para «Ocultar lo impreso»).
+  async function recordPrint(job) {
     job.w.printLog.push({ at: now(), mode: job.mode, pages: job.pages });
     if (job.w.status === 'borrador') job.w.status = 'impreso';
+    job.w.printedChars = job.chars;
     await DB.put('works', job.w);
-    if (state.work === job.w) { $('#ed-state').value = job.w.status; renderLog(); }
-  });
+    if (state.work === job.w) { $('#ed-state').value = job.w.status; renderLog(); syncHide(); Editor.refreshPrinted(); }
+  }
   $('#btn-print-fondo').addEventListener('click', () => print('fondo'));
-  // Ctrl+P en el editor usa la impresión de la suite (con papel si hay papel asignado).
+  // Ctrl+P en el editor usa la impresión de Lexia (con papel si hay papel asignado).
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p' && !$('#view-editor').hidden) {
       e.preventDefault();
@@ -624,6 +1020,38 @@
   });
   $('#btn-print-texto').addEventListener('click', () => print('texto'));
 
+  // PDF tamaño legal: algunas impresoras no toman el tamaño de la página desde el navegador; desde un visor de PDF sí.
+  $('#btn-pdf').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const d = $('#dlg-pdf');
+    d.returnValue = '';
+    d.showModal();
+    const mode = await new Promise((r) => d.addEventListener('close', () => r(d.returnValue), { once: true }));
+    if ((mode !== 'fondo' && mode !== 'texto') || !(await facesFor(mode))) return;
+    btn.disabled = true;
+    try {
+      await saveWork();
+      const mm = 72 / 25.4;
+      const chars = Editor.printedUpTo(mode);
+      const pages = await Editor.pdfPages(mode, { x: state.app.printOffsetX * mm, y: state.app.printOffsetY * mm }, (n, total) => setStatus(`Preparando PDF ${n}/${total}…`));
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await PDF.write(pages));
+      a.download = `${state.work.title.replace(/[\\/:*?"<>|]+/g, '-')}${mode === 'texto' ? ' (solo texto)' : ''}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      toast(`PDF descargado: ${pages.length} página${pages.length === 1 ? '' : 's'} tamaño legal.`);
+      if (await confirmDialog('¿Va a imprimir este PDF en el papel sellado?', 'Si lo imprime, anótelo: queda en el historial y, con «Ocultar lo impreso», la próxima vez solo saldrá el texto nuevo.', 'Anotar como impreso')) {
+        await recordPrint({ w: state.work, mode, pages: pages.length, chars });
+      }
+    } catch (err) {
+      console.error(err);
+      toast('No se pudo preparar el PDF');
+    } finally {
+      btn.disabled = false;
+      setStatus('Guardado');
+    }
+  });
+
   // ---------- respaldo ----------
   const blobToDataUrl = (b) => new Promise((r, j) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => j(fr.error); fr.readAsDataURL(b); });
 
@@ -631,19 +1059,27 @@
     if (unsaved()) await saveWork();
     if (state.work && unsaved()) state.work.pages = Editor.pagesHtml(); // aunque el guardado falle, el respaldo lleva el texto actual
     toast('Preparando respaldo…');
-    const files = await DB.all('files');
-    const out = {
-      app: 'papel-sellado-suite', version: 1, exportedAt: now(),
-      files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(f.blob) }))),
-      papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app, profile: Profile.filled() ? Profile.get() : undefined,
-    };
+    let out;
+    try {
+      const files = await DB.all('files');
+      out = {
+        app: 'papel-sellado-suite', version: 1, exportedAt: now(),
+        files: await Promise.all(files.map(async (f) => ({ id: f.id, name: f.name, addedAt: f.addedAt, data: await blobToDataUrl(await fileBlob(f.id)) }))),
+        papers: state.papers, works: state.works.map(({ _plain, ...w }) => w), settings: state.app, profile: Profile.filled() ? Profile.get() : undefined,
+      };
+    } catch (err) {
+      // Con cuenta, los PDF que aún no están en este navegador se bajan para el respaldo.
+      console.error(err);
+      toast(err.offline ? 'Sin conexión: no se pudieron bajar de su cuenta los PDF de papel sellado para el respaldo. Intente de nuevo con internet.' : 'No se pudo preparar el respaldo.');
+      return;
+    }
     const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `respaldo-papel-sellado-${now().slice(0, 10)}.json`;
+    a.download = `respaldo-lexia-${now().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    toast(`Respaldo descargado: ${out.works.length} trabajos, ${out.papers.length} hojas.`);
+    toast(`Respaldo descargado: ${plural(out.works.length, 'trabajo')}, ${plural(out.papers.length, 'hoja')}.`);
   });
 
   // El respaldo viene de un archivo: se valida y el HTML de los trabajos se limpia antes de guardarlo.
@@ -674,8 +1110,8 @@
     if (!file) return;
     let data;
     try { data = JSON.parse(await file.text()); } catch { toast('El archivo no es un respaldo válido'); return; }
-    if (data?.app !== 'papel-sellado-suite' || !Array.isArray(data.works) || !Array.isArray(data.papers) || !Array.isArray(data.files)) { toast('El archivo no es un respaldo de Papel Sellado Suite'); return; }
-    if (!(await confirmDialog('Importar respaldo', `Se importarán ${data.works.length} trabajos y ${data.papers.length} hojas${data.profile ? ', y sus datos de «Mis datos»' : ''}. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
+    if (data?.app !== 'papel-sellado-suite' || !Array.isArray(data.works) || !Array.isArray(data.papers) || !Array.isArray(data.files)) { toast('El archivo no es un respaldo de Lexia'); return; }
+    if (!(await confirmDialog('Importar respaldo', `Se importarán ${plural(data.works.length, 'trabajo')} y ${plural(data.papers.length, 'hoja')}${data.profile ? ', y sus datos de «Mis datos»' : ''}. Los que ya existan con el mismo identificador se reemplazarán.`, 'Importar'))) return;
     try {
       const files = [];
       for (const f of data.files) {
@@ -699,6 +1135,8 @@
         pages: (Array.isArray(w.pages) ? w.pages : []).map((h) => cleanStored(str(h))),
         paperIds: (Array.isArray(w.paperIds) ? w.paperIds : []).map((id) => str(id) || null),
         printLog: (Array.isArray(w.printLog) ? w.printLog : []).map((l) => ({ at: str(l.at), mode: l.mode === 'fondo' ? 'fondo' : 'texto', pages: num(l.pages) ?? 0 })),
+        printedChars: Math.max(0, num(w.printedChars) ?? 0), label: LABELS.includes(w.label) ? w.label : undefined,
+        protocolo: Number.isInteger(num(w.protocolo)) ? num(w.protocolo) : undefined, protocoloAt: str(w.protocoloAt) || undefined,
       }));
       for (const w of works) w.settings.font = FONTS.some(([v]) => v === w.settings.font) ? w.settings.font : DEFAULT_SETTINGS.font;
       // Lo local manda: una hoja que ya existe conserva su estado y trabajo actuales; no se duplica una serie-número.
@@ -724,7 +1162,7 @@
         return true;
       });
       if (fixed.length) await DB.putMany('works', fixed);
-      toast(`Respaldo importado: ${works.length} trabajos, ${papers.length} hojas.`);
+      toast(`Respaldo importado: ${plural(works.length, 'trabajo')}, ${plural(papers.length, 'hoja')}.`);
       route();
     } catch (err) {
       console.error(err);
@@ -744,8 +1182,14 @@
       navigator.locks.request('papel-sellado-suite', { ifAvailable: true }, (lock) => { resolve(!!lock); return lock ? new Promise(() => {}) : null; });
     });
     if (!alone) {
-      document.querySelector('main').innerHTML = '<div class="empty">La suite ya está abierta en otra pestaña o ventana. Use esa, o ciérrela y recargue esta página, para no sobrescribir sus trabajos.</div>';
+      document.querySelector('main').innerHTML = '<div class="empty">Lexia ya está abierta en otra pestaña o ventana. Use esa, o ciérrela y recargue esta página, para no sobrescribir sus trabajos.</div>';
       return;
+    }
+    // Con Firebase configurado, Lexia pide cuenta; sin configurar, todo queda en este navegador como antes.
+    if (Cloud.enabled) {
+      if (!Cloud.resume()) await login();
+      await openAccount();
+      await paywall();
     }
     try {
       navigator.storage?.persist?.(); // pide al navegador no borrar los datos por falta de espacio

@@ -1,8 +1,8 @@
 {
-  "name": "papel-sellado-suite",
+  "name": "lexia",
   "version": "1.0.0",
   "private": true,
-  "description": "Suite para escribir e imprimir sobre papel sellado digital de la DGI de Nicaragua",
+  "description": "Lexia: escribir e imprimir sobre papel sellado digital de la DGI de Nicaragua",
   "scripts": {
     "test": "node --test test/*.test.js",
     "serve": "python3 -m http.server 8000"

@@ -1,36 +1,39 @@
 # Guía para agentes (Claude Code, Codex, Gemini, Cursor, etc.)
 
-Papel Sellado Suite: web estática para abogados y notarios de Nicaragua. Suben el papel sellado digital de la DGI (PDF), escriben sobre sus renglones e imprimen con o sin el papel de fondo. Publicada en GitHub Pages desde `main`: https://jose21nc.github.io/papel-sellado-suite/
+Lexia (antes «Papel Sellado Suite»): web estática para abogados y notarios de Nicaragua. Suben el papel sellado digital de la DGI (PDF), escriben sobre sus renglones e imprimen con o sin el papel de fondo. Publicada en https://lexia-suite.cloud (Hostinger, desplegada por Git desde `main`; ver `PUBLICAR.md`). Los identificadores internos conservan el nombre anterior (`papel-sellado-suite`: base IndexedDB, bloqueo de pestaña, `app` del respaldo) para no perder datos ni respaldos.
 
 ## Reglas del proyecto
 - HTML, CSS y JavaScript sin compilación, sin frameworks y sin dependencias. pdf.js 3.11 está incluido en `vendor/` y corre en el hilo principal para que `index.html` funcione también con doble clic (file://). Scripts clásicos, no módulos.
 - Interfaz, comentarios y mensajes de commit en español. Comentarios cortos, solo para el porqué.
 - El cambio más pequeño que resuelva todo. No agregar opciones ni código "para después".
 - **La geometría de impresión es sagrada.** Las páginas miden 612×1008 pt (legal) y el texto debe caer sobre los 30 renglones de la DGI. No tocar sin necesidad: `.page`, `.area`, `.seal`, `.ed` (y sus `p`), `.dash`, `.rule`, `p.firma`, `.f2`, `@page` ni el bloque `@media print` de `css/app.css`.
-- Todo HTML que se guarde en un trabajo debe estar permitido en `normalize()` (editor), en `sanitize()` si debe sobrevivir al pegar, y en `cleanStored()` (importar respaldo, `js/app.js`).
-- Los datos viven solo en el navegador (IndexedDB). Nunca subir al repo PDFs reales de papel sellado: traen datos personales (`*.pdf` y `local/` están en `.gitignore`).
+- HTML de un trabajo: `p` (alineación, `firma`), `b`, `i`, `u`, `br`, `span.f2`, `span.campo`. Todo HTML que se guarde en un trabajo debe estar permitido en `normalize()` (editor), en `sanitize()` si debe sobrevivir al pegar, y en `cleanStored()` (importar respaldo, `js/app.js`).
+- Los datos viven en IndexedDB (una base por cuenta) y, si `js/firebase-config.js` está lleno, también en Firebase (`js/cloud.js`, ver `FIREBASE.md`): todo cambio pasa por `DB.put/putMany/del`, que lo anota en la cola `outbox`; escrituras que vienen de la nube usan `local = true`. Sin configuración Lexia funciona sin cuenta. Nunca subir al repo PDFs ni protocolos .docx reales: traen datos personales (`*.pdf`, `*.docx` y `local/` están en `.gitignore`; las pruebas usan documentos sintéticos).
 
 ## Mapa del código
 | Archivo | Qué hace |
 |---|---|
-| `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-editor`), barra del editor y todos los `<dialog>` |
-| `css/app.css` | Estilos con variables en `:root` (claro/oscuro), estética minimalista tipo Apple; reglas de papel e impresión |
+| `index.html` | Vistas (`#view-works`, `#view-papers`, `#view-perfil` con Mis datos y respaldo, `#view-editor`), barra del editor y todos los `<dialog>` |
+| `css/app.css` | Estilos con variables en `:root` (paleta de Lexia: `--navy` #1B365D y `--sky` #4BB3DB). Claro por omisión; oscuro con `html[data-theme="dark"]` (botón `#btn-theme`, guardado en `localStorage` `lexia-theme` y aplicado en el `<head>` antes de pintar). Animaciones con `--ease`/`--spring`: secciones que suben escalonadas, diálogos y menú con `@starting-style`; se apagan con `prefers-reduced-motion`. Las filas y tarjetas entran escalonadas solo mientras `body.entering` (lo pone `route()` ~0,9 s), no al filtrar. Segmentos `.glide` (secciones, `#bg-mode`): el relieve se desliza al botón con `aria-current`/`aria-pressed` (app.js lo mide y pone `--gx`/`--gw`/`--go`). El aviso `#toast` entra y sale con transiciones: ocultarlo siempre con `hidden`. Nunca animar `.page` ni sus hijos: se miden al paginar. Reglas de papel e impresión |
+| `img/logo.svg` | Logo (favicon); en la página va como `<symbol id="logo">` dentro de `index.html`, con los colores de la paleta. `img/og.jpg` (vista previa al compartir) y `img/apple-touch-icon.png` salen del mismo logo |
 | `js/parse.js` | Lee del texto del PDF: valor, serie, número, cara y renglones (ajuste por mínimos cuadrados). Puro, con pruebas |
-| `js/db.js` | IndexedDB: `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) |
-| `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp) |
-| `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml` |
-| `js/app.js` | Rutas por hash, inventario, trabajos, autoguardado, asignación de papel, impresión, respaldo, bloqueo de una sola pestaña |
+| `js/db.js` | IndexedDB por cuenta (`DB.use(uid)`): `files`, `papers`, `works`, `settings` (`app`, `profile`, `welcome`) y `outbox` (cambios por subir); `DB.onChange` avisa a la nube |
+| `js/cloud.js` / `js/firebase-config.js` | Cuenta (correo y contraseña) y Firestore de Firebase por REST, sin SDK ni Storage: los PDF van en trozos (`chunks`) de 750 KB; cola de subida (cada 20 s como máximo, por la cuota gratuita), `pull` al entrar, PDF bajo demanda. Reglas en `firebase/`. Probado con un Firebase falso que intercepta las llamadas REST |
+| `js/pdf.js` | Carga y dibuja páginas del PDF (pantalla 2×, impresión 300 ppp); `write()` arma el PDF descargable (una imagen JPEG por página) |
+| `js/editor.js` | Un `contenteditable` por cara; el texto fluye entre páginas (`paginate`, `splitOverflow`, `joinSplit`; párrafos partidos con `data-split`/`data-cont`); cursor con marcadores `.mk-s`/`.mk-e`; deshacer por instantáneas; guiones de cierre; firmas; `insertHtml`; `pdfPages` dibuja cada cara en un lienzo para «Descargar PDF»; «Ocultar lo impreso» marca los primeros `work.printedChars` caracteres con `CSS.highlights` (`::highlight(impreso)`) y sus guiones con `.dash.impreso` |
+| `js/app.js` | Pantalla de entrada (`login`, `openAccount`), muro de pago (`paywall`: C$ 800 por Poket o cupón `CUPONES`; licencia en `licencias/{uid}`, solo se crea; cuentas anteriores a `MURO_DESDE` exentas), rutas por hash, inventario, trabajos (menú «⋯» `#work-menu` con popover, etiquetas de color), autoguardado, asignación de papel, impresión (`recordPrint` anota `printLog` y `printedChars`; copias sin anotar), protocolo del año (`w.protocolo = año`, `addToProtocol`, importar .docx), «Subir Word» crea un trabajo desde un .docx (`askWork`, `readDocx`, `docSettings`), respaldo, bloqueo de una sola pestaña |
 | `js/words.js` | Números, fechas y horas en letras (pruebas en `test/words.test.js`) |
 | `js/profile.js` | «Mis datos» del notario e introducción de primera vez |
-| `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md` |
-| `js/firmas.js` | Diálogo de bloques de firma |
+| `js/templates-data.js` / `js/templates.js` | 59 plantillas notariales; catálogo, fuentes y revisión en `PLANTILLAS.md`. Un clic en un campo `[ASÍ]` abre `#dlg-campo`: `fieldKind`/`fieldText` (con pruebas) deciden cómo se escribe el dato |
+| `js/firmas.js` | Diálogo de bloques de firma (nombre y calidad en negrita). En `editor.js`, `fixFirmas` pasa el formato que envuelve una línea de dos firmas adentro de cada mitad |
+| `js/docx.js` | Lee un .docx sin dependencias (ZIP con `DecompressionStream`) y pasa sus párrafos al HTML de Lexia (pruebas con `test/fixtures/protocolo-prueba.docx`, sintético) |
 
 ## Comandos
 ```bash
 npm test                         # pruebas (node --test)
 npm run serve                    # http://localhost:8000
 ```
-No hay paso de compilación: publicar es `git push` a `main` (GitHub Pages tarda unos minutos).
+No hay paso de compilación. Publicar: `./deploy.sh` (rsync por SSH a Hostinger, solo `index.html`, `.htaccess`, `css/`, `js/`, `img/`, `vendor/`; pide la contraseña, que nunca va al repo) o `git push` a `main` si está activada la implementación automática (ver `PUBLICAR.md`). `.htaccess` fuerza HTTPS, pone encabezados de seguridad, evita copias viejas en caché, comprime y no sirve `.git`, documentación ni pruebas.
 
 ## Cómo verificar cambios
 1. `npm test`.
@@ -40,7 +43,7 @@ No hay paso de compilación: publicar es `git push` a `main` (GitHub Pages tarda
 
 ## Estado y pendientes conocidos
 - Sin probar en Safari ni Firefox.
-- En el celular la barra del editor se desplaza de lado.
-- Arrastrar texto dentro del documento copia en vez de mover.
-- Editar dentro de una línea de dos firmas (p. ej. Enter en medio) puede dejar marcado raro.
+- Muro de pago: lo hace cumplir el cliente (las reglas protegen la licencia, no los datos); el pago no se verifica en línea con Poket (no hay webhook): el administrador revisa los comprobantes en la consola. Si cambian los cupones, cambiarlos en `js/app.js` y en `firebase/firestore.rules`.
+- Firebase: probado contra un Firebase simulado y contra el proyecto real lexia-suite (plan Spark, sin Storage), con una cuenta de prueba que se borra al terminar. Un documento de Firestore admite 1 MB (≈ 300 caras): un protocolo más grande no se sube.
+- En el celular la barra del editor se desplaza de lado (a propósito: no cabe en una fila).
 - Plantillas: son modelos; la base legal de la frase del quinquenio y los requisitos actuales de Migración para menores no se verificaron.

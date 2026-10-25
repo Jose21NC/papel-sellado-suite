@@ -1,7 +1,7 @@
 // node --test test/
 const test = require('node:test');
 const assert = require('node:assert');
-const { numberToWords: w, dateToWords, timeToWords, dateTimeToWords, isoDateToWords } = require('../js/words.js');
+const { numberToWords: w, dateToWords, timeToWords, dateTimeToWords, isoDateToWords, spellCode, amountToWords } = require('../js/words.js');
 
 test('números en letras', () => {
   const cases = {
@@ -37,4 +37,18 @@ test('fecha ISO del quinquenio', () => {
   assert.strictEqual(isoDateToWords(''), '');
   assert.strictEqual(isoDateToWords('2029-02-30'), '');
   assert.strictEqual(isoDateToWords('15/03/2029'), '');
+});
+
+test('códigos carácter por carácter', () => {
+  assert.strictEqual(spellCode('001-01A'), 'cero, cero, uno, guion, cero, uno, letra A');
+  assert.strictEqual(spellCode(' m 12/b '), 'letra M, uno, dos, barra, letra B');
+  assert.strictEqual(spellCode('ñ.9'), 'letra Ñ, punto, nueve');
+});
+
+test('cantidades en letras', () => {
+  assert.strictEqual(amountToWords('1,500'), 'mil quinientos');
+  assert.strictEqual(amountToWords('250.75'), 'doscientos cincuenta punto setenta y cinco');
+  assert.strictEqual(amountToWords('10.05'), 'diez punto cero cinco');
+  assert.strictEqual(amountToWords('12-A'), null);
+  assert.strictEqual(amountToWords(''), null);
 });

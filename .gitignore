@@ -2,3 +2,6 @@ local/
 *.pdf
 node_modules/
 .DS_Store
+# Protocolos reales en Word: traen datos personales
+*.docx
+!test/fixtures/*.docx

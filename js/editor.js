@@ -159,6 +159,7 @@ const Editor = (() => {
     for (const el of ed.querySelectorAll('font, span:not([class])')) el.replaceWith(...el.childNodes);
     // Un campo de plantilla [ASÍ] deja de resaltarse en cuanto se escribe el dato.
     for (const el of ed.querySelectorAll('span.campo')) if (!/^\[[^\]]*\]$/.test(el.textContent)) el.replaceWith(...el.childNodes);
+    fixFirmas(ed);
     const ps = ed.children;
     for (let k = 0; k < ps.length; k++) {
       const p = ps[k];
@@ -166,6 +167,60 @@ const Editor = (() => {
       if (k < ps.length - 1) p.removeAttribute('data-split');
       if (!p.textContent && !p.querySelector('br')) p.append(document.createElement('br'));
     }
+  }
+
+  // Una línea de firmas lleva una firma o dos mitades (.f2). Editar puede dejar mitades sueltas o de más
+  // (que no caben en el renglón): se reparten de dos en dos y una mitad sola vuelve a ser texto.
+  function fixFirmas(ed) {
+    const unwrap = (s) => {
+      const prev = s.previousSibling;
+      const space = prev && /\S$/.test(prev.textContent) && /^\S/.test(s.textContent);
+      s.replaceWith(...(space ? [' '] : []), ...s.childNodes);
+    };
+    // Dar formato a toda una línea de dos firmas envuelve las mitades (<b><span class="f2">…): el formato pasa adentro
+    // de cada mitad, para no juntar los dos nombres.
+    for (let w; (w = [...ed.querySelectorAll('p.firma b, p.firma i, p.firma u')].find((x) => x.querySelector(':scope > .f2')));) {
+      for (const s of w.querySelectorAll(':scope > .f2')) { const f = w.cloneNode(false); f.append(...s.childNodes); s.append(f); }
+      w.replaceWith(...w.childNodes);
+    }
+    for (const s of ed.querySelectorAll('.f2')) if (!s.parentNode.matches('p.firma')) unwrap(s);
+    for (const p of ed.querySelectorAll('p.firma')) {
+      const halves = [...p.children].filter((c) => c.classList.contains('f2'));
+      let at = p;
+      for (let k = 2; k < halves.length; k += 2) {
+        const line = p.cloneNode(false);
+        line.append(...halves.slice(k, k + 2));
+        at.after(line);
+        at = line;
+      }
+    }
+    for (const p of ed.querySelectorAll('p.firma')) {
+      const halves = [...p.children].filter((c) => c.classList.contains('f2'));
+      if (halves.length === 1) unwrap(halves[0]);
+    }
+  }
+
+  // Enter en una línea de dos firmas no parte las mitades: abre un renglón antes (al inicio) o después.
+  function enterInPair() {
+    const s = getSelection();
+    const p = s.rangeCount && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode).closest?.('p.firma');
+    if (!p || !p.querySelector(':scope > .f2')) return false;
+    snapshot();
+    const probe = document.createRange();
+    probe.selectNodeContents(p);
+    probe.setEnd(s.anchorNode, s.anchorOffset);
+    const before = s.isCollapsed && probe.toString() === '';
+    // Igual que al final de un bloque de firmas: dentro del bloque es otro renglón para firmar; al final, texto.
+    const line = document.createElement('p');
+    if (before || p.nextElementSibling?.classList.contains('firma')) line.className = 'firma';
+    line.append(document.createElement('br'));
+    if (before) p.before(line); else p.after(line);
+    const r = document.createRange();
+    r.setStart(before ? p : line, 0);
+    s.removeAllRanges();
+    s.addRange(r);
+    reflow(eds.indexOf(hostOf(p)) - 1);
+    return true;
   }
 
   // Une el último párrafo de `a` con el primero de `b` cuando son el mismo párrafo partido entre páginas.
@@ -325,6 +380,7 @@ const Editor = (() => {
     range.setStartBefore(s);
     if (e && e.closest('.ed') === ed) range.setEndBefore(e); else range.collapse(true);
     s.remove(); e?.remove();
+    ed.normalize(); // une el texto que partieron los marcadores (el rango se ajusta solo)
     if (document.activeElement !== ed) ed.focus({ preventScroll: true });
     const sel = getSelection();
     sel.removeAllRanges();
@@ -348,7 +404,47 @@ const Editor = (() => {
     const end = paginate(start, full);
     if (had) restoreSelection(scroll);
     if (full) scheduleDashes(0, eds.length); else scheduleDashes(start, end + 1);
+    markPrinted();
     ctx.changed();
+  }
+
+  // ---------- texto ya impreso ----------
+  // work.printedChars: hasta qué carácter del documento ya está impreso en el papel. Con «Ocultar lo impreso»
+  // ese texto y sus guiones se ven grises y no se imprimen, para seguir escribiendo en la misma hoja.
+  let showAll = false; // imprimir una copia completa
+  const hiding = () => !showAll && work.settings.hidePrinted && work.printedChars > 0;
+
+  function markPrinted() {
+    if (!window.CSS?.highlights) return;
+    CSS.highlights.delete('impreso');
+    if (!hiding()) return;
+    const r = document.createRange();
+    r.setStart(eds[0], 0);
+    let left = work.printedChars;
+    for (const ed of eds) {
+      const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+      for (let t; (t = walker.nextNode());) {
+        if (t.length >= left) { r.setEnd(t, left); CSS.highlights.set('impreso', new Highlight(r)); return; }
+        left -= t.length;
+      }
+    }
+    r.setEnd(eds[eds.length - 1], eds[eds.length - 1].childNodes.length);
+    CSS.highlights.set('impreso', new Highlight(r));
+  }
+
+  // all: mostrar todo (copia); si no, según el ajuste del trabajo.
+  function refreshPrinted(all = false) {
+    showAll = all;
+    markPrinted();
+    drawDashes(true);
+  }
+
+  // Caracteres que quedan impresos en el modo dado (con papel, hasta la última cara con papel asignado).
+  function printedUpTo(mode) {
+    let last = eds.length - 1, n = 0;
+    if (mode === 'fondo') while (last > 0 && !paperFor(last)?.pages[last % 2]) last--;
+    for (let i = 0; i <= last; i++) n += eds[i].textContent.length;
+    return n;
   }
 
   function schedule(from) {
@@ -377,9 +473,9 @@ const Editor = (() => {
     dirty.clear();
     const plans = targets.map((ed) => [ed, work.settings.dashes ? measureDashes(ed) : []]);
     for (const [ed, list] of plans) {
-      ed.closest('.page').querySelector('.dashes').replaceChildren(...list.map(([left, top, width]) => {
+      ed.closest('.page').querySelector('.dashes').replaceChildren(...list.map(([left, top, width, printed]) => {
         const d = document.createElement('div');
-        d.className = 'dash';
+        d.className = printed ? 'dash impreso' : 'dash';
         d.style.cssText = `left:${left}pt;top:${top}pt;width:${width}pt`;
         d.textContent = '-'.repeat(160);
         return d;
@@ -396,8 +492,13 @@ const Editor = (() => {
     const area = ed.parentNode.getBoundingClientRect();
     const lineH = area.height / Number(ed.dataset.lines);
     const seal = ed.previousElementSibling.getBoundingClientRect();
-    const add = (x0, x1, top) => { if (x1 - x0 >= 6 * k) out.push([(x0 - pr.left) / k, (top - pr.top) / k, (x1 - x0) / k]); };
+    // Un guion ya está impreso si su párrafo terminó antes del límite (un renglón vacío justo en el límite es nuevo).
+    let end = hiding() ? eds.slice(0, eds.indexOf(ed)).reduce((n, e) => n + e.textContent.length, 0) : 0, printed = false;
+    const add = (x0, x1, top) => { if (x1 - x0 >= 6 * k) out.push([(x0 - pr.left) / k, (top - pr.top) / k, (x1 - x0) / k, printed]); };
     for (const p of ed.children) {
+      const len = p.textContent.length;
+      end += len;
+      printed = hiding() && (end < work.printedChars || (end === work.printedChars && len > 0));
       if (p.hasAttribute('data-split') || p.classList.contains('firma')) continue; // la línea de firma queda en blanco
       const pRect = p.getBoundingClientRect();
       if (pRect.bottom > area.bottom + 1) break; // lo que no cabe se mueve a la página siguiente
@@ -613,6 +714,7 @@ const Editor = (() => {
     if (e.inputType.startsWith('format')) return; // viene de format(), que ya tomó su instantánea
     if (e.inputType === 'historyUndo') { e.preventDefault(); undo(); return; }
     if (e.inputType === 'historyRedo') { e.preventDefault(); redo(); return; }
+    if ((e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') && enterInPair()) { e.preventDefault(); lastGroup = ''; return; }
     if (e.inputType === 'insertLineBreak') { e.preventDefault(); snapshot(); document.execCommand('insertParagraph'); return; }
     const group = e.inputType.startsWith('insertText') ? 'text' : e.inputType.startsWith('delete') ? 'del' : e.inputType;
     if (keepStyle) { keepStyle = false; lastSnapAt = Date.now(); } // la instantánea ya se tomó al dar formato
@@ -620,7 +722,8 @@ const Editor = (() => {
     lastGroup = group;
   }
 
-  function insertClean(data) {
+  // move: rango arrastrado desde el mismo documento, que se borra antes de insertar (en un solo paso de deshacer).
+  function insertClean(data, move) {
     const html = data.getData('text/html');
     const text = data.getData('text/plain');
     if (!html && !text) return; // imagen o archivo: nada que pegar
@@ -628,6 +731,21 @@ const Editor = (() => {
     if (!clean) return;
     snapshot();
     lastGroup = '';
+    if (move) {
+      const sel = getSelection();
+      const at = mark('mk-drop');
+      sel.getRangeAt(0).insertNode(at);
+      hostOf(move.startContainer).focus({ preventScroll: true });
+      sel.removeAllRanges();
+      sel.addRange(move);
+      document.execCommand('delete');
+      const r = document.createRange();
+      r.setStartBefore(at);
+      hostOf(at).focus({ preventScroll: true });
+      at.remove();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
     document.execCommand('insertHTML', false, clean);
   }
 
@@ -635,6 +753,20 @@ const Editor = (() => {
     if (!e.target.closest?.('.ed')) return;
     e.preventDefault();
     if (!spansPages()) insertClean(e.clipboardData);
+  }
+
+  // Vuelve a juntar en `box` los párrafos partidos entre páginas.
+  function joinAll(box) {
+    for (const p of [...box.children]) if (p.parentNode === box) while (joinSplit(p, p.nextElementSibling));
+    for (const p of box.children) { p.removeAttribute('data-split'); p.removeAttribute('data-cont'); }
+  }
+
+  // Las caras de un trabajo guardado en un solo HTML (p. ej. para agregarlo al protocolo).
+  function joinPages(pages) {
+    const box = document.createElement('div');
+    box.innerHTML = pages.join('');
+    joinAll(box);
+    return box.innerHTML;
   }
 
   // Copiar una selección de varias páginas: solo el texto (sin barras ni números de renglón) y con los
@@ -652,24 +784,32 @@ const Editor = (() => {
       if (ed.contains(r.endContainer)) sub.setEnd(r.endContainer, r.endOffset);
       box.append(sub.cloneContents());
     }
-    for (const p of [...box.children]) if (p.parentNode === box) while (joinSplit(p, p.nextElementSibling));
-    for (const p of box.children) { p.removeAttribute('data-split'); p.removeAttribute('data-cont'); }
+    joinAll(box);
     e.clipboardData.setData('text/html', box.innerHTML);
     e.clipboardData.setData('text/plain', [...box.children].map((p) => p.textContent).join('\n'));
   }
 
-  // Soltar texto arrastrado pasa por la misma limpieza que pegar.
-  // shortcut: arrastrar dentro del documento copia en vez de mover; usar cortar y pegar para mover.
+  // Soltar texto arrastrado pasa por la misma limpieza que pegar. Arrastrar dentro del documento mueve el texto
+  // (salvo una selección de varias páginas, que solo se copia).
+  let dragged = null;
+  function onDragStart() {
+    const s = getSelection();
+    dragged = s.rangeCount && !spansPages() && inDoc(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
+  }
+
   function onDrop(e) {
     const ed = e.target.closest?.('.ed');
+    const move = dragged;
+    dragged = null;
     if (!ed) return;
     e.preventDefault();
     const r = caretFromPoint(e.clientX, e.clientY);
     if (!r || !ed.contains(r.startContainer)) return;
+    if (move?.isPointInRange(r.startContainer, r.startOffset)) return; // soltado sobre sí mismo
     ed.focus({ preventScroll: true });
     getSelection().removeAllRanges();
     getSelection().addRange(r);
-    insertClean(e.dataTransfer);
+    insertClean(e.dataTransfer, move);
   }
 
   // ---------- comandos de formato ----------
@@ -788,6 +928,22 @@ const Editor = (() => {
     reflow(Math.max(0, eds.indexOf(ed) - 1));
   }
 
+  // Cambia el documento con fn (p. ej. llenar un campo) en un solo paso de deshacer; fn devuelve el nodo tras el
+  // que queda el cursor.
+  function edit(fn) {
+    snapshot();
+    lastGroup = '';
+    const node = fn();
+    const ed = hostOf(node);
+    if (!ed) return;
+    const r = document.createRange();
+    r.setStartAfter(node);
+    ed.focus({ preventScroll: true });
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    reflow(Math.max(0, eds.indexOf(ed) - 1));
+  }
+
   // Enter al final de un bloque de firmas: la línea nueva es texto normal (el navegador copia la clase).
   function plainAfterFirma(e) {
     const s = getSelection();
@@ -820,6 +976,8 @@ const Editor = (() => {
       root.addEventListener('keydown', onKeyDown);
       root.addEventListener('beforeinput', onBeforeInput);
       root.addEventListener('paste', onPaste);
+      root.addEventListener('dragstart', onDragStart);
+      root.addEventListener('dragend', () => { dragged = null; });
       root.addEventListener('drop', onDrop);
       document.addEventListener('copy', onCopy); // con la selección en varias páginas el evento no siempre nace dentro
       document.addEventListener('selectionchange', syncButtons);
@@ -872,8 +1030,103 @@ const Editor = (() => {
     drawDashes(true);
   }
 
+  // ---------- PDF descargable ----------
+  // Distancia (px de pantalla) del borde superior del texto a su línea base, como la calcula el navegador.
+  const ascents = new Map();
+  function domAscent(font) {
+    if (!ascents.has(font)) {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:normal';
+      d.style.font = font;
+      d.innerHTML = 'Hg<span style="display:inline-block;width:0;height:0"></span>';
+      document.body.append(d);
+      const r = document.createRange();
+      r.selectNodeContents(d.firstChild);
+      ascents.set(font, d.lastChild.getBoundingClientRect().top - r.getBoundingClientRect().top);
+      d.remove();
+    }
+    return ascents.get(font);
+  }
+
+  // Dibuja el texto de `el` donde está en pantalla, palabra por palabra (así se respeta el justificado).
+  // starts: posición de cada texto en el documento, para saltar lo ya impreso (antes de `limit`).
+  function drawText(cx, el, starts, limit) {
+    const range = document.createRange();
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let t; (t = walker.nextNode());) {
+      const at = starts.get(t) ?? Infinity;
+      if (!t.data.trim() || at + t.length <= limit) continue;
+      const st = getComputedStyle(t.parentElement);
+      const font = `${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
+      cx.font = font;
+      cx.letterSpacing = st.letterSpacing === 'normal' ? '0px' : st.letterSpacing;
+      cx.fillStyle = st.color;
+      const up = domAscent(font);
+      const put = (s, a) => {
+        range.setStart(t, a);
+        range.setEnd(t, a + s.length);
+        const rects = [...range.getClientRects()].filter((r) => r.width > 0);
+        if (rects.length === 1) cx.fillText(s, rects[0].left, rects[0].top + up);
+        else if (s.length > 1) [...s].forEach((ch, j) => put(ch, a + j)); // palabra partida entre dos líneas
+      };
+      for (const m of t.data.matchAll(/\S+/g)) if (at + m.index >= limit) put(m[0], m.index);
+      if (t.parentElement.closest('u') && at >= limit) {
+        const size = parseFloat(st.fontSize);
+        range.selectNodeContents(t);
+        for (const r of range.getClientRects()) cx.fillRect(r.left, r.top + up + size * 0.1, r.width, size * 0.06);
+      }
+    }
+  }
+
+  // Cada cara a 300 ppp en JPEG, igual que al imprimir. offset (pt): corrimiento de la impresora en «solo texto».
+  async function pdfPages(mode, offset, onProgress) {
+    getSelection().removeAllRanges();
+    drawDashes(true);
+    const starts = new Map();
+    let n = 0;
+    for (const ed of eds) for (const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT); w.nextNode();) { starts.set(w.currentNode, n); n += w.currentNode.length; }
+    const limit = hiding() ? work.printedChars : 0;
+    const out = [];
+    for (let i = 0; i < eds.length; i++) {
+      const paper = paperFor(i);
+      if (mode === 'fondo' && !paper?.pages[i % 2]) continue;
+      onProgress?.(i + 1, eds.length);
+      const g = geometryFor(i);
+      const c = document.createElement('canvas');
+      c.width = Math.round(g.width * PRINT_SCALE);
+      c.height = Math.round(g.height * PRINT_SCALE);
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#fff';
+      cx.fillRect(0, 0, c.width, c.height);
+      if (mode === 'fondo') {
+        const img = new Image();
+        img.src = await ctx.image(paper, i % 2, PRINT_SCALE);
+        await img.decode();
+        cx.drawImage(img, 0, 0, c.width, c.height);
+      } else cx.translate(offset.x * PRINT_SCALE, offset.y * PRINT_SCALE);
+      const page = eds[i].closest('.page');
+      const pr = page.getBoundingClientRect();
+      const k = pr.width / g.width; // px de pantalla por pt
+      cx.scale(PRINT_SCALE / k, PRINT_SCALE / k);
+      cx.translate(-pr.left, -pr.top);
+      // Mismos recortes que en pantalla: el área de texto (clip-path) y cada guion (overflow: hidden).
+      for (const [el, box, dx, dy] of [[eds[i], eds[i].parentNode, 6, 2], ...[...page.querySelectorAll('.dash:not(.impreso)')].map((d) => [d, d, 0, 0])]) {
+        const b = box.getBoundingClientRect();
+        cx.save();
+        cx.beginPath();
+        cx.rect(b.left - dx * k, b.top - dy * k, b.width + 2 * dx * k, b.height + 2 * dy * k);
+        cx.clip();
+        drawText(cx, el, starts, limit);
+        cx.restore();
+      }
+      out.push({ jpeg: await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92)), width: g.width, height: g.height, px: c.width, py: c.height });
+      c.width = c.height = 0; // libera la memoria del lienzo
+    }
+    return out;
+  }
+
   return {
-    mount, relayout, applySettings, format, undo, redo, preparePrint, sanitize, insertHtml,
+    mount, relayout, applySettings, format, undo, redo, preparePrint, pdfPages, sanitize, insertHtml, edit, refreshPrinted, printedUpTo, joinPages,
     pagesHtml: () => eds.map((e) => e.innerHTML),
     pageCount: () => eds.length,
     paperForPage: paperFor,

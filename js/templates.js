@@ -37,7 +37,35 @@
     }).join('');
   }
 
-  if (typeof module !== 'undefined' && module.exports) { module.exports = { build }; return; }
+  // Cómo se escribe cada campo [ASÍ] según su nombre.
+  function fieldKind(label) {
+    if (/^FECHA EN (LETRAS|QUE VENCE)/.test(label)) return 'fecha';
+    if (label === 'HORA EN LETRAS') return 'hora';
+    if (/CÉDULA|PASAPORTE|MOTOR|CHASIS|PLACA|CIRCULACIÓN|SERIE/.test(label)) return 'codigo';
+    if (label === 'PORCENTAJE') return 'porcentaje';
+    if (/ EN LETRAS$/.test(label)) return 'letras';
+    if (/^(NÚMERO|TOMO|FOLIO|ASIENTO|DÍA|AÑO)( DE FINCA| DE PROTOCOLO| DE CARNÉ| CATASTRAL| EN LETRAS \(EN CIFRAS\))?$|^CARNÉ$/.test(label)) return 'numero';
+    return 'texto';
+  }
+
+  // Texto que queda en el documento para el dato v; '' si el dato no sirve.
+  function fieldText(kind, v) {
+    v = v.trim();
+    if (!v) return '';
+    if (kind === 'fecha') return W.isoDateToWords(v);
+    if (kind === 'hora') { const m = /^(\d{1,2}):(\d{2})/.exec(v); return m ? W.timeToWords(new Date(2000, 0, 1, +m[1], +m[2])) : ''; }
+    if (kind === 'codigo') return `${W.spellCode(v)} (${v})`;
+    const words = W.amountToWords(v);
+    // Lo que ya viene en letras («dos años») queda igual; las cifras dentro del texto («24 meses») se pasan a letras.
+    if (kind === 'letras') return words ?? v.replace(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g, (n) => W.amountToWords(n) ?? n);
+    if (kind === 'numero') return /\d/.test(v) ? `${words ?? W.spellCode(v)} (${v})` : v;
+    if (kind === 'porcentaje') return words ? `${words} por ciento (${v} %)` : v;
+    return v;
+  }
+
+  if (typeof module !== 'undefined' && module.exports) { module.exports = { build, fieldKind, fieldText }; return; }
+
+  root.PS_TEMPLATES = { build };
 
   // ---------- diálogo ----------
   const $ = (s) => document.querySelector(s);
@@ -86,14 +114,93 @@
     if (d.returnValue === 'ok' && t) Editor.insertHtml(build(t, Profile.get(), new Date(), $('#tpl-num').value));
   });
 
-  // Un clic en un campo [ASÍ] lo selecciona entero: lo que se escriba lo reemplaza.
+  // ---------- campos [ASÍ]: un clic abre un diálogo que escribe el dato como lo pide la escritura ----------
+  const dc = $('#dlg-campo');
+  const input = $('#campo-input');
+  const HINTS = {
+    codigo: 'Escríbalo como aparece en el documento (p. ej. 001-010190-0001A): se pone en letras, carácter por carácter, y entre paréntesis tal cual.',
+    letras: 'Escriba la cifra (p. ej. 1,500 o 250.75): se pone en letras.',
+    numero: 'Escriba la cifra: se pone en letras y, entre paréntesis, en cifras.',
+    porcentaje: 'Escriba el porcentaje en cifras: se pone en letras y en cifras.',
+    fecha: 'Elija la fecha: se pone en letras.',
+    hora: 'Elija la hora: se pone en letras.',
+    texto: 'Escriba el dato tal como debe quedar.',
+  };
+  let campo = null, kind = 'texto', pair = null;
+
+  // El dato va en mayúsculas si el texto que lo antecede lo está (p. ej. «ESCRITURA PÚBLICA NÚMERO»).
+  function upperAround(el) {
+    const r = document.createRange();
+    r.selectNodeContents(el.closest('p'));
+    r.setEndBefore(el);
+    const letters = r.toString().replace(/[^\p{L}]/gu, '').slice(-12);
+    return letters.length > 2 && letters === up(letters);
+  }
+
+  function output() {
+    const t = fieldText(kind, input.value);
+    return kind !== 'texto' && upperAround(campo) ? up(t) : t;
+  }
+
+  function refresh() {
+    const t = output();
+    $('#campo-out').textContent = t;
+    dc.querySelector('button[value=ok]').disabled = !t;
+  }
+
+  function openCampo(el) {
+    campo = el;
+    const label = el.textContent.slice(1, -1);
+    kind = fieldKind(label);
+    // [PRECIO EN LETRAS] llena también el [PRECIO EN CIFRAS] que le sigue.
+    const twin = kind === 'letras' && `[${label.replace(/ EN LETRAS$/, '')} EN CIFRAS]`;
+    pair = twin && [...$('#pages').querySelectorAll('.campo')].find((c) => c.textContent === twin && el.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING);
+    $('#campo-title').textContent = label;
+    const opts = kind === 'texto' && label.includes(' / ') ? label.split(' / ') : [];
+    $('#campo-hint').textContent = (opts.length ? 'Elija una opción o escriba el dato.' : HINTS[kind]) + (pair ? ` También se llena ${twin}.` : '');
+    $('#campo-opts').innerHTML = '';
+    for (const o of opts) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn small';
+      b.textContent = o;
+      b.onclick = () => { input.value = o; refresh(); input.focus(); };
+      $('#campo-opts').append(b);
+    }
+    input.type = kind === 'fecha' ? 'date' : kind === 'hora' ? 'time' : 'text';
+    input.inputMode = ['letras', 'numero', 'porcentaje'].includes(kind) ? 'decimal' : 'text';
+    input.placeholder = kind === 'codigo' ? '001-010190-0001A' : '';
+    input.value = '';
+    refresh();
+    dc.returnValue = '';
+    dc.showModal();
+    input.focus();
+  }
+
+  input.addEventListener('input', refresh);
+  dc.addEventListener('close', () => {
+    const el = campo, twin = pair;
+    let t = dc.returnValue === 'ok' && el?.isConnected ? output() : '';
+    campo = pair = null;
+    if (!t) return;
+    const figure = input.value.trim();
+    Editor.edit(() => {
+      // «a las [HORA EN LETRAS]»: el artículo ya está en el texto («a la una» si es la una).
+      const prev = el.previousSibling;
+      if (kind === 'hora' && prev?.nodeType === 3 && /\blas? $/i.test(prev.data)) {
+        const [, art, rest] = /^(\S+) (.*)$/.exec(t);
+        prev.data = prev.data.replace(/las? $/i, (m) => (m[0] === 'L' ? up(art) : art) + ' ');
+        t = rest;
+      }
+      const node = document.createTextNode(t);
+      el.replaceWith(node);
+      if (twin?.isConnected) twin.replaceWith(figure);
+      return node;
+    });
+  });
+
   $('#pages').addEventListener('click', (e) => {
     const c = e.target.closest?.('.campo');
-    const s = getSelection();
-    if (!c || !s.isCollapsed) return;
-    const r = document.createRange();
-    r.selectNodeContents(c);
-    s.removeAllRanges();
-    s.addRange(r);
+    if (c && getSelection().isCollapsed && /^\[[^\]]*\]$/.test(c.textContent)) openCampo(c);
   });
 })(this);

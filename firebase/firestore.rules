@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cada usuario solo lee y escribe sus propios datos: users/{uid}/works, papers, files, chunks y settings.
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Licencia del muro de pago. El usuario la crea una sola vez, activa, con un cupón válido o con el comprobante
+    // de su pago en Poket. Solo el administrador la cambia o la borra (desde la consola, que no pasa por estas reglas).
+    match /licencias/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.estado == 'activa'
+        && request.resource.data.email is string
+        && (
+          (request.resource.data.via == 'cupon' && request.resource.data.cupon in ['BOREALABS'])
+          || (request.resource.data.via == 'pago' && request.resource.data.monto == 800
+              && request.resource.data.comprobante is string
+              && request.resource.data.comprobante.matches('^[A-Za-z0-9-]{4,40}$'))
+        );
+      allow update, delete: if false;
+    }
+  }
+}

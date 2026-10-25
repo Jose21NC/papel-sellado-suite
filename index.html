@@ -3,22 +3,91 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Papel Sellado Suite</title>
-  <link rel="icon" href="data:,"> <!-- sin favicon: evita un 404 -->
+  <title>Lexia</title>
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <meta name="description" content="Lexia: escrituras, protocolo y papel sellado de la DGI de Nicaragua. Escriba sobre los renglones e imprima exacto.">
+  <meta name="theme-color" content="#1B365D">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="canonical" href="https://lexia-suite.cloud/">
+  <!-- Vista previa al compartir el enlace (WhatsApp, redes). -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Lexia">
+  <meta property="og:title" content="Lexia · Escrituras, protocolo y papel sellado">
+  <meta property="og:description" content="Escriba sobre los renglones del papel sellado de la DGI, use plantillas notariales e imprima exacto. Para abogados y notarios de Nicaragua.">
+  <meta property="og:url" content="https://lexia-suite.cloud/">
+  <meta property="og:image" content="https://lexia-suite.cloud/img/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="es_NI">
+  <meta name="twitter:card" content="summary_large_image">
+  <!-- El modo oscuro se aplica antes de pintar para que no parpadee en claro. -->
+  <script>try { if (localStorage.getItem('lexia-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="logo" viewBox="0 0 100 100" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7 27 19v57h29l7 12H12Z" stroke="var(--navy)" stroke-width="5" stroke-linejoin="miter"/><g stroke="var(--sky)" stroke-width="4.5"><path d="M67 14v56q0 18-18 18"/><path d="M45 24q22-9 44 0M46 25 38 45M46 25l8 20M88 25l-8 20M88 25l8 20"/></g><g fill="var(--sky)"><path d="M67 3l4 6-4 6-4-6Z"/><path d="M35 45h22a11 9 0 0 1-22 0ZM77 45h22a11 9 0 0 1-22 0Z"/><rect x="66" y="84" width="22" height="5" rx="2.5"/></g></symbol></svg>
+  <!-- Entrar o crear cuenta (solo si Firebase está configurado) -->
+  <section id="auth" class="auth" hidden>
+    <div class="auth-brand">
+      <svg class="auth-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <div class="auth-name">LEXIA</div>
+      <p>Escrituras, protocolo y papel sellado de Nicaragua, en un solo lugar.</p>
+    </div>
+    <form class="auth-card" id="auth-form" novalidate>
+      <h1 id="auth-title">Entrar</h1>
+      <p class="muted" id="auth-sub">Con su cuenta, sus trabajos, su protocolo y su papel sellado quedan guardados y los puede abrir en cualquier computadora.</p>
+      <label>Correo <input type="email" name="email" autocomplete="email" required></label>
+      <label>Contraseña <input type="password" name="password" autocomplete="current-password" required></label>
+      <label id="auth-confirm" hidden>Repita la contraseña <input type="password" name="confirm" autocomplete="new-password"></label>
+      <p class="auth-error" id="auth-error" role="alert"></p>
+      <button class="btn primary" id="auth-submit">Entrar</button>
+      <button type="button" class="linklike" id="auth-switch">¿No tiene cuenta? Crear una</button>
+      <button type="button" class="linklike" id="auth-reset">¿Olvidó su contraseña?</button>
+    </form>
+  </section>
+
+  <!-- Muro de pago: un solo pago por cuenta (o un cupón) -->
+  <section id="paywall" class="auth" hidden>
+    <div class="auth-brand">
+      <svg class="auth-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <div class="auth-name">LEXIA</div>
+      <ul class="perks">
+        <li>59 plantillas notariales que se llenan solas</li>
+        <li>Su protocolo del año, siempre al día</li>
+        <li>Impresión exacta sobre los renglones de la DGI</li>
+        <li>Sus documentos en la nube, en cualquier computadora</li>
+      </ul>
+    </div>
+    <form class="auth-card" id="pay-form" novalidate>
+      <h1>Active Lexia</h1>
+      <p class="muted" id="pay-sub">Un solo pago, sin mensualidades. Lexia queda activa para siempre en su cuenta.</p>
+      <div class="price"><span>C$</span>800<small>pago único</small></div>
+      <a class="btn primary pay-link" id="pay-link" href="https://pagoconpoket.com/merchant/49b0e861-b261-4a15-8e15-730acdcfc530/link/373a96c4-540c-48ae-a4e1-d46afd160114" target="_blank" rel="noopener">1. Pagar C$ 800 con Poket</a>
+      <label>2. Número de comprobante de Poket <input type="text" name="comprobante" autocomplete="off" placeholder="El que aparece al terminar el pago"></label>
+      <button class="btn" id="pay-submit" value="pago">Ya pagué: activar Lexia</button>
+      <p class="auth-error" id="pay-error" role="alert"></p>
+      <details class="coupon" id="coupon">
+        <summary>¿Tiene un cupón?</summary>
+        <div class="coupon-row">
+          <input type="text" name="cupon" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Código" aria-label="Código del cupón">
+          <button class="btn" value="cupon">Aplicar</button>
+        </div>
+      </details>
+      <p class="hint muted">Cada comprobante se verifica con Poket; si el pago no aparece, la cuenta se desactiva. <span id="pay-email"></span></p>
+      <button type="button" class="linklike" id="pay-logout">Entrar con otra cuenta</button>
+    </form>
+  </section>
+
   <header class="top">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span> Papel Sellado Suite</div>
-    <nav class="tabs" aria-label="Secciones">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg><use href="#logo"/></svg></span> Lexia</div>
+    <nav class="tabs glide" aria-label="Secciones">
       <button class="tab" data-route="trabajos">Mis trabajos</button>
       <button class="tab" data-route="papel">Papel sellado</button>
     </nav>
     <div class="spacer"></div>
     <div class="top-actions">
-      <button class="btn small quiet" id="btn-profile" title="Sus datos de abogado o notario, para llenar las plantillas">Mis datos</button>
-      <button class="btn small quiet" id="btn-export" title="Descarga un archivo con todos sus trabajos y papeles">Exportar respaldo</button>
-      <button class="btn small quiet" id="btn-import" title="Restaura un respaldo exportado antes">Importar respaldo</button>
+      <button class="icon-btn" id="btn-theme" aria-label="Cambiar a modo oscuro" title="Modo oscuro"><svg class="ico moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"/></svg><svg class="ico sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"/></svg></button>
+      <button class="tab tab-perfil" data-route="perfil" title="Mis datos y respaldo"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.75 14c.6-2.7 2.7-4.25 5.25-4.25s4.65 1.55 5.25 4.25"/></svg>Perfil</button>
     </div>
   </header>
 
@@ -28,6 +97,9 @@
       <div class="view-head">
         <h1>Mis trabajos</h1>
         <button class="btn primary" id="btn-new-work">+ Nuevo trabajo</button>
+        <button class="btn" id="btn-word" title="Convierte un documento de Word (.docx) en un trabajo, acomodado a los renglones del papel sellado">Subir Word</button>
+        <input type="file" id="file-word" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+        <button class="btn" id="btn-protocolo" title="Su protocolo del año: un solo documento que crece con cada escritura">Protocolo</button>
         <div class="spacer"></div>
         <div class="filters">
           <input type="search" id="works-search" placeholder="Buscar por título, cliente o texto" aria-label="Buscar trabajos">
@@ -72,6 +144,34 @@
       <div class="table-wrap" id="papers-table"></div>
     </section>
 
+    <!-- Perfil -->
+    <section id="view-perfil" hidden>
+      <div class="view-head"><h1>Perfil</h1></div>
+      <div class="panels">
+        <div class="panel">
+          <h2><span class="panel-ico" aria-hidden="true"><svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.25"/><circle cx="8" cy="6.5" r="2"/><path d="M4.3 12.6c.8-1.4 2.2-2.1 3.7-2.1s2.9.7 3.7 2.1"/></svg></span>Cuenta</h2>
+          <p class="muted" id="cuenta-info"></p>
+          <p class="muted" id="cuenta-licencia"></p>
+          <p class="muted" id="cuenta-sync"></p>
+          <button class="btn" id="btn-logout" hidden>Cerrar sesión</button>
+        </div>
+        <div class="panel">
+          <h2><span class="panel-ico" aria-hidden="true"><svg class="ico" viewBox="0 0 16 16"><rect x="1.75" y="3.25" width="12.5" height="9.5" rx="1.75"/><circle cx="5.5" cy="7.1" r="1.4"/><path d="M3.5 10.6c.4-.9 1.1-1.35 2-1.35s1.6.45 2 1.35M9.5 6.5h3M9.5 9h2"/></svg></span>Mis datos</h2>
+          <p class="muted" id="perfil-resumen"></p>
+          <p class="muted">Su nombre, título, cédula, carné, quinquenio y protocolo: se usan para llenar las plantillas y las firmas.</p>
+          <button class="btn" id="btn-profile">Editar mis datos</button>
+        </div>
+        <div class="panel">
+          <h2><span class="panel-ico" aria-hidden="true"><svg class="ico" viewBox="0 0 16 16"><rect x="1.75" y="2.75" width="12.5" height="3" rx="1"/><path d="M2.75 5.75v6.5a1 1 0 0 0 1 1h8.5a1 1 0 0 0 1-1v-6.5M8 7.75v3.5M6.5 9.75 8 11.25l1.5-1.5"/></svg></span>Respaldo</h2>
+          <p class="muted">Descargue un archivo con todos sus trabajos, su papel sellado y sus datos, o restaure uno.</p>
+          <div class="panel-actions">
+            <button class="btn" id="btn-export">Exportar respaldo</button>
+            <button class="btn" id="btn-import">Importar respaldo</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Editor -->
     <section id="view-editor" hidden>
       <div class="toolbar">
@@ -84,6 +184,8 @@
           </div>
           <div class="spacer"></div>
           <div class="group">
+            <button class="btn small" id="btn-hide-printed" aria-pressed="false" disabled title="Para seguir escribiendo en una hoja ya impresa: lo que ya se imprimió se ve gris y no se vuelve a imprimir (use «Imprimir solo texto»). Se activa después de anotar una impresión.">Ocultar lo impreso</button>
+            <button class="btn small" id="btn-pdf" aria-haspopup="dialog" title="Descarga un PDF tamaño legal para imprimirlo desde otro programa (p. ej. Vista Previa)">Descargar PDF</button>
             <button class="btn small" id="btn-print-texto" title="Imprime solo el texto, para papel sellado ya impreso">Imprimir solo texto</button>
             <button class="btn small primary" id="btn-print-fondo" title="Imprime el papel sellado completo con el texto encima">Imprimir con papel</button>
           </div>
@@ -114,7 +216,7 @@
             <button class="btn small" data-cmd="undo" aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 2 6l3 3M2 6h7.5a3.5 3.5 0 0 1 0 7H6"/></svg></button>
             <button class="btn small" data-cmd="redo" aria-label="Rehacer" title="Rehacer (Ctrl+Shift+Z)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="m11 3 3 3-3 3m3-3H6.5a3.5 3.5 0 0 0 0 7H10"/></svg></button>
           </div>
-          <div class="seg" id="bg-mode" role="group" aria-label="Papel sellado en pantalla"><button class="btn small" data-bg="" aria-pressed="true" title="Papel sellado normal">Papel</button><button class="btn small" data-bg="bg-dim" aria-pressed="false" title="Atenuar el papel sellado (no cambia la impresión)">Atenuado</button><button class="btn small" data-bg="bg-off" aria-pressed="false" title="Ocultar el papel sellado (no cambia la impresión)">Oculto</button></div>
+          <div class="seg glide" id="bg-mode" role="group" aria-label="Papel sellado en pantalla"><button class="btn small" data-bg="" aria-pressed="true" title="Papel sellado normal">Papel</button><button class="btn small" data-bg="bg-dim" aria-pressed="false" title="Atenuar el papel sellado (no cambia la impresión)">Atenuado</button><button class="btn small" data-bg="bg-off" aria-pressed="false" title="Ocultar el papel sellado (no cambia la impresión)">Oculto</button></div>
         </div>
       </div>
       <div class="pages" id="pages"></div>
@@ -126,6 +228,7 @@
       <h2 id="datos-title">Datos del trabajo</h2>
       <div class="side">
         <div>
+          <div id="ed-work-fields">
           <div class="row"><span>Cliente / partes</span></div>
           <input type="text" id="ed-client" style="width:100%" aria-label="Cliente o partes">
           <div class="row" style="margin-top:8px"><span>Tipo de papel</span>
@@ -134,10 +237,11 @@
           <div class="row"><span>Estado</span>
             <select id="ed-state"><option value="borrador">Borrador</option><option value="impreso">Impreso</option><option value="finalizado">Finalizado</option></select></div>
           <textarea id="ed-notes" placeholder="Notas (número de escritura, fecha, observaciones…)" aria-label="Notas"></textarea>
+          </div>
 
           <h3>Papel</h3>
           <p id="ed-count" class="muted" style="margin:0 0 8px"></p>
-          <button class="btn small" id="btn-autoassign" style="width:100%">Asignar papel disponible</button>
+          <button type="button" class="btn small" id="btn-autoassign" style="width:100%">Asignar papel disponible</button>
 
           <h3>Historial</h3>
           <ul class="log" id="ed-log"></ul>
@@ -161,19 +265,20 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-work">
+  <dialog id="dlg-work" aria-labelledby="work-dlg-title">
     <form method="dialog">
-      <h2>Nuevo trabajo</h2>
+      <h2 id="work-dlg-title">Nuevo trabajo</h2>
+      <p class="hint" id="work-dlg-hint" hidden></p>
       <label>Título <input type="text" name="title" required placeholder="Ej.: Testimonio escritura Nº 45 — Compraventa"></label>
       <label>Cliente / partes <input type="text" name="client"></label>
       <label>Tipo de papel
         <select name="kind"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select>
       </label>
-      <div class="buttons"><button class="btn primary" value="ok">Crear</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+      <div class="buttons"><button class="btn primary" value="ok" id="work-dlg-ok">Crear</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
     </form>
   </dialog>
 
-  <dialog id="dlg-pick">
+  <dialog id="dlg-pick" aria-labelledby="pick-title">
     <form method="dialog">
       <h2 id="pick-title">Elegir papel sellado</h2>
       <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="pick-all"> Mostrar todos los tipos y valores</label>
@@ -182,9 +287,9 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-paper">
+  <dialog id="dlg-paper" aria-labelledby="paper-title">
     <form method="dialog">
-      <h2>Editar papel</h2>
+      <h2 id="paper-title">Editar papel</h2>
       <label>Tipo <select name="type"><option value="testimonio">Testimonio</option><option value="protocolo">Protocolo</option><option value="otro">Otro</option></select></label>
       <label>Valor (C$) <input type="number" name="value" min="0" step="1"></label>
       <label>Serie <input type="text" name="serie"></label>
@@ -193,7 +298,53 @@
     </form>
   </dialog>
 
-  <dialog id="dlg-confirm">
+  <dialog id="dlg-pdf" aria-labelledby="pdf-title">
+    <form method="dialog">
+      <h2 id="pdf-title">Descargar PDF</h2>
+      <p class="hint" style="margin:0">Un PDF tamaño legal (8.5 × 14 pulg.) a 300 ppp. Ábralo e imprímalo en papel legal a tamaño real (100 %).</p>
+      <div class="buttons"><button class="btn primary" value="fondo">Con papel</button><button class="btn" value="texto">Solo texto</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <div id="work-menu" class="menu" popover>
+    <button type="button" data-act="dup">Duplicar</button>
+    <button type="button" data-act="protocol">Agregar al protocolo</button>
+    <button type="button" data-act="copy">Imprimir copia</button>
+    <div class="menu-tags" role="group" aria-label="Etiqueta">
+      <span>Etiqueta</span>
+      <button type="button" class="tag" data-label="" aria-label="Sin etiqueta" title="Sin etiqueta"></button>
+      <button type="button" class="tag rojo" data-label="rojo" aria-label="Roja" title="Roja"></button>
+      <button type="button" class="tag naranja" data-label="naranja" aria-label="Naranja" title="Naranja"></button>
+      <button type="button" class="tag amarillo" data-label="amarillo" aria-label="Amarilla" title="Amarilla"></button>
+      <button type="button" class="tag verde" data-label="verde" aria-label="Verde" title="Verde"></button>
+      <button type="button" class="tag azul" data-label="azul" aria-label="Azul" title="Azul"></button>
+    </div>
+    <hr>
+    <button type="button" data-act="delete" class="danger">Eliminar</button>
+  </div>
+
+  <dialog id="dlg-protocolo" aria-labelledby="protocolo-title">
+    <form method="dialog">
+      <h2 id="protocolo-title">Protocolo</h2>
+      <p class="hint">El protocolo es un solo documento que crece durante el año con cada escritura y queda activo hasta el 31 de diciembre. Empiécelo con el acta de apertura o suba el que ya lleva en Word: Lexia lo adapta a los renglones del papel sellado.</p>
+      <label>Año <input type="number" id="protocolo-anio" min="2000" max="2100" step="1"></label>
+      <div class="buttons"><button class="btn primary" value="docx">Subir .docx</button><button class="btn" value="nuevo">Empezar con el acta de apertura</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+  <input type="file" id="file-docx" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+
+  <dialog id="dlg-campo" aria-labelledby="campo-title">
+    <form method="dialog">
+      <h2 id="campo-title"></h2>
+      <p class="hint" id="campo-hint" style="margin:0"></p>
+      <div class="campo-opts" id="campo-opts"></div>
+      <input type="text" id="campo-input" autocomplete="off" aria-labelledby="campo-title">
+      <p class="campo-out" id="campo-out" aria-live="polite"></p>
+      <div class="buttons"><button class="btn primary" value="ok">Poner</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-confirm" aria-labelledby="confirm-title" aria-describedby="confirm-text">
     <form method="dialog">
       <h2 id="confirm-title">¿Confirmar?</h2>
       <p id="confirm-text" style="margin:0"></p>
@@ -208,7 +359,7 @@
   <dialog id="dlg-profile" aria-labelledby="profile-title">
     <form method="dialog">
       <h2 id="profile-title">Mis datos</h2>
-      <p class="hint">Se usan para llenar las plantillas automáticamente. Se guardan solo en este navegador y en sus respaldos.</p>
+      <p class="hint">Se usan para llenar las plantillas automáticamente. <span data-sin-cuenta>Se guardan solo en este navegador y en sus respaldos.</span><span data-con-cuenta hidden>Se guardan en su cuenta y en sus respaldos.</span></p>
       <div class="fields" id="profile-fields"></div>
       <button type="button" class="linklike" id="btn-welcome-again">Ver la introducción</button>
       <div class="buttons"><button class="btn primary" value="ok">Guardar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
@@ -218,10 +369,11 @@
   <dialog id="dlg-welcome" aria-labelledby="welcome-title">
     <form method="dialog">
       <section data-step="1">
-        <span class="brand-mark big" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6"/><path d="M7.5 7.5h9M7.5 11h9M7.5 14.5h9M7.5 18h5"/></svg></span>
-        <h2 id="welcome-title" tabindex="-1">Le damos la bienvenida a Papel Sellado Suite</h2>
+        <span class="brand-mark big" aria-hidden="true"><svg><use href="#logo"/></svg></span>
+        <h2 id="welcome-title" tabindex="-1">Le damos la bienvenida a Lexia</h2>
         <p>Escriba escrituras y testimonios directamente sobre el papel sellado digital de la DGI e imprímalos alineados con sus 30 renglones.</p>
-        <p class="hint">Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
+        <p class="hint" data-sin-cuenta>Todo se guarda en este navegador: sus documentos no se envían a ningún servidor.</p>
+        <p class="hint" data-con-cuenta hidden>Sus trabajos, su protocolo y su papel sellado se guardan en su cuenta: los puede abrir en cualquier computadora.</p>
       </section>
       <section data-step="2" hidden>
         <h2 tabindex="-1">Cómo funciona</h2>
@@ -233,7 +385,7 @@
       </section>
       <section data-step="3" hidden>
         <h2 tabindex="-1">Sus datos (opcional)</h2>
-        <p class="hint">Con ellos las plantillas se llenan solas: nombre, domicilio, quinquenio, ciudad… Se guardan solo en este navegador. Puede completarlos o cambiarlos cuando quiera en «Mis datos».</p>
+        <p class="hint">Con ellos las plantillas se llenan solas: nombre, domicilio, quinquenio, ciudad… <span data-sin-cuenta>Se guardan solo en este navegador.</span><span data-con-cuenta hidden>Se guardan en su cuenta.</span> Puede completarlos o cambiarlos cuando quiera en «Mis datos».</p>
         <div class="fields" id="welcome-fields"></div>
       </section>
       <section data-step="4" hidden>
@@ -253,7 +405,7 @@
   <dialog id="dlg-templates" class="wide" aria-labelledby="tpl-title">
     <form method="dialog">
       <h2 id="tpl-title">Plantillas</h2>
-      <p class="hint">Modelos de referencia según la Ley del Notariado, el Código Civil y el Código de Familia: revíselos y adáptelos al caso. Los campos en amarillo se completan a mano.</p>
+      <p class="hint">Modelos de referencia según la Ley del Notariado, el Código Civil y el Código de Familia: revíselos y adáptelos al caso. Los campos en amarillo se completan después: haga clic en uno para escribir el dato; las cifras, fechas y horas se ponen en letras.</p>
       <div class="tpl-bar">
         <input type="search" id="tpl-q" placeholder="Buscar: poder, hipoteca, vehículo…" aria-label="Buscar plantilla">
         <select id="tpl-cat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
@@ -275,7 +427,7 @@
         <label>Filas de firmas <input type="number" id="firmas-rows" min="1" max="6" step="1" value="1"></label>
         <label>Renglones para firmar <input type="number" id="firmas-blank" min="1" max="3" step="1" value="2"></label>
       </div>
-      <label class="check"><input type="checkbox" id="firmas-notario"> Agregar mi firma de notario (de «Mis datos»)</label>
+      <label class="check"><input type="checkbox" id="firmas-notario"> Usar mis datos en la primera firma (de «Mis datos»)</label>
       <div class="firma-rows" id="firmas-list"></div>
       <div class="buttons"><button class="btn primary" value="ok">Insertar</button><button class="btn" value="cancel" formnovalidate>Cancelar</button></div>
     </form>
@@ -286,10 +438,13 @@
   <script src="vendor/pdfjs/pdf.worker.min.js"></script>
   <script src="js/parse.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/cloud.js"></script>
   <script src="js/pdf.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/words.js"></script>
   <script src="js/profile.js"></script>
+  <script src="js/docx.js"></script>
   <script src="js/templates-data.js"></script>
   <script src="js/templates.js"></script>
   <script src="js/firmas.js"></script>
