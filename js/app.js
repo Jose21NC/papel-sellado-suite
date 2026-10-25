@@ -470,9 +470,10 @@
     if (doc) toast('Documento importado: revise el texto antes de imprimir.');
   }
 
-  // Tipo y tamaño de letra del Word, si la suite los tiene.
+  // Tipo y tamaño de letra del Word, si la suite los tiene (por su nombre o el de su familia: «Bookman Old Style»).
   function docSettings(doc) {
-    const font = FONTS.find(([, label]) => label.toLowerCase() === (doc.font || '').toLowerCase());
+    const name = (doc.font || '').toLowerCase();
+    const font = FONTS.find(([v, label]) => [label, ...v.split(',')].some((n) => n.trim().replace(/"/g, '').toLowerCase() === name));
     return { ...(font && { font: font[0] }), ...(doc.size && { size: doc.size }) };
   }
 
@@ -835,8 +836,8 @@
   // En Plantillas, el Nº de escritura sigue al protocolo del año.
   $('#btn-templates').addEventListener('click', () => {
     const p = protocolOf(thisYear());
-    if (!p || p === state.work && unsaved()) return;
-    $('#tpl-num').value = escrituras(p) + 1;
+    if (!p) return;
+    $('#tpl-num').value = escrituras(p === state.work ? { pages: Editor.pagesHtml() } : p) + 1; // en el protocolo abierto, con lo aún sin guardar
     $('#tpl-num').dispatchEvent(new Event('input'));
   });
 

@@ -56,8 +56,9 @@
     if (kind === 'hora') { const m = /^(\d{1,2}):(\d{2})/.exec(v); return m ? W.timeToWords(new Date(2000, 0, 1, +m[1], +m[2])) : ''; }
     if (kind === 'codigo') return `${W.spellCode(v)} (${v})`;
     const words = W.amountToWords(v);
-    if (kind === 'letras') return words ?? W.spellCode(v);
-    if (kind === 'numero') return `${words ?? W.spellCode(v)} (${v})`;
+    // Lo que ya viene en letras («dos años») queda igual; las cifras dentro del texto («24 meses») se pasan a letras.
+    if (kind === 'letras') return words ?? v.replace(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g, (n) => W.amountToWords(n) ?? n);
+    if (kind === 'numero') return /\d/.test(v) ? `${words ?? W.spellCode(v)} (${v})` : v;
     if (kind === 'porcentaje') return words ? `${words} por ciento (${v} %)` : v;
     return v;
   }
