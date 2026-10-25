@@ -368,7 +368,8 @@
     // Un PDF que no se reconoció no tiene serie ni número: se nombra por su archivo.
     const hoja = p.serie || p.numero ? `la hoja ${p.serie ? p.serie + ' ' : ''}Nº ${p.numero || '—'}` : `la hoja de «${p.fileName}»`;
     if (act === 'view') {
-      const blob = await fileBlob(p.fileId);
+      let blob;
+      try { blob = await fileBlob(p.fileId); } catch (err) { console.error(err); return toast('No se pudo bajar el PDF de su cuenta: revise su conexión.'); }
       if (!blob) return toast('No se encontró el PDF');
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
